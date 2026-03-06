@@ -51,7 +51,7 @@
       </div>
     </section>
 
-    <!-- 입력란 묶음: 역량평가 + 총평 -->
+    <!-- 입력란 묶음: 역량평가 + 최종 총평 -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
       <!-- 역량평가 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
@@ -81,15 +81,15 @@
         </div>
       </div>
 
-      <!-- 총평 -->
+      <!-- 최종 총평 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h2 class="text-sm font-semibold text-slate-900">🧾 총평</h2>
+            <h2 class="text-sm font-semibold text-slate-900">🧾 최종 총평</h2>
             <p class="text-xs text-slate-500">후보자 전체에 대한 최종 의견과 판정을 남깁니다.</p>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600">최종 결과</span>
+            <span class="text-xs text-slate-600">최종 판정</span>
             <select id="finalDecision" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
               <option value="">선택</option>
               <option value="추천">추천</option>
@@ -100,7 +100,7 @@
         </div>
 
         <div class="mt-3">
-          <label class="block text-xs font-medium text-slate-700 mb-1">총평 메모</label>
+          <label class="block text-xs font-medium text-slate-700 mb-1">최종 총평 메모</label>
           <textarea id="finalComment" rows="6"
             class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             placeholder="후보자 전체 강점/우려점/추가 확인 필요사항 등을 적어주세요."></textarea>
@@ -680,7 +680,7 @@
               <div class="rounded-xl bg-white border border-slate-200 p-3">
                 <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
                 <div class="text-xs text-slate-600 mt-1">
-                  점수: ${scoreLabel(ev.score)} · 질문세트 ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}
+                  점수: ${scoreLabel(ev.score)}
                 </div>
                 <div class="text-xs text-slate-700 mt-2 font-medium">메인 질문</div>
                 <div class="text-sm text-slate-800">${escapeHtml(ev.mainQuestion || "-")}</div>
@@ -738,7 +738,6 @@
         직무: ev.role || "",
         역량: ev.competency || "",
         평가점수: scoreLabel(ev.score),
-        질문세트: `${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || ""}`,
         메인질문: ev.mainQuestion || "",
         메모: ev.memo || "",
         수정시각: ev.updatedAt ? new Date(ev.updatedAt).toLocaleString() : ""
@@ -753,7 +752,7 @@
       const ws2 = XLSX.utils.json_to_sheet(evaluationRows);
       ws2["!cols"] = [
         { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
-        { wch: 12 }, { wch: 40 }, { wch: 50 }, { wch: 20 }
+        { wch: 40 }, { wch: 50 }, { wch: 20 }
       ];
       XLSX.utils.book_append_sheet(wb, ws2, "역량평가");
 
@@ -775,7 +774,6 @@
           <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
           <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
           <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))}</p>
-          <p><strong>질문세트:</strong> ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}</p>
           <p><strong>메인 질문:</strong> ${escapeHtml(ev.mainQuestion || "-")}</p>
           <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
         </div>
@@ -936,4 +934,3 @@
   </script>
 </body>
 </html>
-
