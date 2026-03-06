@@ -51,35 +51,36 @@
       </div>
     </section>
 
-    <!-- 선택 영역 -->
-    <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
-        <select id="roleSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+    <!-- 현재 역량 평가 -->
+    <section class="mb-6 rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-900">⭐ 평가 작성란</h2>
+          <p class="text-xs text-slate-500">현재 선택한 역량에 대한 점수와 메모를 작성해 저장할 수 있습니다.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-600">평가 점수</span>
+          <select id="scoreSelect" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
+            <option value="">선택</option>
+            <option value="1">1 · 부족함</option>
+            <option value="2">2 · 개선필요</option>
+            <option value="3">3 · 기대충족</option>
+            <option value="4">4 · 기대초과</option>
+            <option value="5">5 · 탁월</option>
+          </select>
+        </div>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택</label>
-        <select id="competencySelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+
+      <div class="mt-3">
+        <label class="block text-xs font-medium text-slate-700 mb-1">면접관 메모</label>
+        <textarea id="memoInput" rows="4"
+          class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
       </div>
     </section>
 
-    <!-- 버튼 영역 -->
+    <!-- 저장/기록/내보내기 버튼 -->
     <section class="mb-6 flex flex-wrap gap-3">
-      <button id="prevQuestionBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        ⬅️ 이전 질문
-      </button>
-
-      <button id="nextQuestionBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        ➡️ 다음 질문
-      </button>
-
-      <button id="behaviorBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        📋 이 역량의 행동지표 보기
-      </button>
-
       <button id="saveEvaluationBtn"
         class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-900 text-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-800">
         💾 현재 역량 평가 저장
@@ -101,32 +102,34 @@
       </button>
     </section>
 
-    <!-- 현재 역량 평가 -->
-    <section class="mb-6 rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-      <div class="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h2 class="text-sm font-semibold text-slate-900">⭐ 현재 선택 역량 평가</h2>
-          <p class="text-xs text-slate-500">같은 후보자에 대해 여러 역량을 저장하면 하나의 면접 세션으로 누적됩니다.</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-600">점수</span>
-          <select id="scoreSelect" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
-            <option value="">선택</option>
-            <option value="1">1 (우려)</option>
-            <option value="2">2</option>
-            <option value="3">3 (보통)</option>
-            <option value="4">4</option>
-            <option value="5">5 (강점)</option>
-          </select>
-        </div>
+    <!-- 직무/역량 선택 -->
+    <section class="mb-6 grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
+        <select id="roleSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
       </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택</label>
+        <select id="competencySelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+      </div>
+    </section>
 
-      <div class="mt-3">
-        <label class="block text-xs font-medium text-slate-700 mb-1">면접관 평가</label>
-        <textarea id="memoInput" rows="4"
-          class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-          placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
-      </div>
+    <!-- 질문 이동/행동지표 버튼 -->
+    <section class="mb-6 flex flex-wrap gap-3">
+      <button id="prevQuestionBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        ⬅️ 이전 질문
+      </button>
+
+      <button id="nextQuestionBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        ➡️ 다음 질문
+      </button>
+
+      <button id="behaviorBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        📋 이 역량의 행동지표 보기
+      </button>
     </section>
 
     <!-- 최종 총평 -->
@@ -256,6 +259,17 @@
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
+    }
+
+    function scoreLabel(score) {
+      const map = {
+        1: "부족함",
+        2: "개선필요",
+        3: "기대충족",
+        4: "기대초과",
+        5: "탁월"
+      };
+      return map[Number(score)] || "-";
     }
 
     function getSelectedContext() {
@@ -528,34 +542,6 @@
       return null;
     }
 
-    function ensureCurrentSession() {
-      const sessions = loadSessions();
-      const key = getSessionKey();
-
-      let session = sessions.find(s => s.sessionKey === key);
-      if (!session) {
-        session = {
-          id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
-          sessionKey: key,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          candidate: {
-            name: safeText(candidateName.value),
-            meta: safeText(candidateMeta.value)
-          },
-          interviewer: safeText(interviewerName.value),
-          date: safeText(interviewDate.value),
-          role: safeText(roleSelect.value),
-          finalDecision: safeText(finalDecision.value),
-          finalComment: safeText(finalComment.value),
-          evaluations: []
-        };
-        sessions.push(session);
-        saveSessions(sessions);
-      }
-      return { sessions, sessionKey: key, session };
-    }
-
     function buildEvaluationRecord() {
       const { role, comp, compData, sets, qSet } = getSelectedContext();
       return {
@@ -690,7 +676,7 @@
               <div class="rounded-xl bg-white border border-slate-200 p-3">
                 <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
                 <div class="text-xs text-slate-600 mt-1">
-                  점수: ${escapeHtml(String(ev.score ?? "-"))} · 질문세트 ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}
+                  점수: ${scoreLabel(ev.score)} (${escapeHtml(String(ev.score ?? "-"))}) · 질문세트 ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}
                 </div>
                 <div class="text-xs text-slate-700 mt-2 font-medium">메인 질문</div>
                 <div class="text-sm text-slate-800">${escapeHtml(ev.mainQuestion || "-")}</div>
@@ -747,7 +733,8 @@
         순번: idx + 1,
         직무: ev.role || "",
         역량: ev.competency || "",
-        점수: ev.score ?? "",
+        점수: scoreLabel(ev.score),
+        점수값: ev.score ?? "",
         질문세트: `${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || ""}`,
         메인질문: ev.mainQuestion || "",
         메모: ev.memo || "",
@@ -762,8 +749,8 @@
 
       const ws2 = XLSX.utils.json_to_sheet(evaluationRows);
       ws2["!cols"] = [
-        { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 8 },
-        { wch: 12 }, { wch: 40 }, { wch: 50 }, { wch: 20 }
+        { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 12 },
+        { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 50 }, { wch: 20 }
       ];
       XLSX.utils.book_append_sheet(wb, ws2, "역량평가");
 
@@ -784,7 +771,7 @@
         <div class="card">
           <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
           <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
-          <p><strong>점수:</strong> ${escapeHtml(String(ev.score ?? "-"))}</p>
+          <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))} (${escapeHtml(String(ev.score ?? "-"))})</p>
           <p><strong>질문세트:</strong> ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}</p>
           <p><strong>메인 질문:</strong> ${escapeHtml(ev.mainQuestion || "-")}</p>
           <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
@@ -946,4 +933,3 @@
   </script>
 </body>
 </html>
-
