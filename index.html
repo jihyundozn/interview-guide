@@ -1,713 +1,879 @@
-<script>
-  const roleSelect = document.getElementById("roleSelect");
-  const competencySelect = document.getElementById("competencySelect");
-  const contentArea = document.getElementById("contentArea");
-  const behaviorBtn = document.getElementById("behaviorBtn");
-  const prevQuestionBtn = document.getElementById("prevQuestionBtn");
-  const nextQuestionBtn = document.getElementById("nextQuestionBtn");
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>역량 기반 면접 가이드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <div class="max-w-5xl mx-auto py-8 px-4">
+    <header class="mb-6">
+      <h1 class="text-2xl font-bold text-slate-900 mb-2">역량 기반 면접 가이드</h1>
+      <p class="text-sm text-slate-600">
+        직무와 역량을 선택하면 해당 역량을 검증하기 위한 질문, 꼬리질문, 관찰 포인트 등을 자동으로 보여줍니다.
+      </p>
+    </header>
 
-  const behaviorModal = document.getElementById("behaviorModal");
-  const behaviorModalContent = document.getElementById("behaviorModalContent");
-  const closeBehaviorModal = document.getElementById("closeBehaviorModal");
-
-  const candidateName = document.getElementById("candidateName");
-  const candidateId = document.getElementById("candidateId");
-  const interviewerName = document.getElementById("interviewerName");
-  const interviewDate = document.getElementById("interviewDate");
-  const scoreSelect = document.getElementById("scoreSelect");
-  const memoInput = document.getElementById("memoInput");
-
-  const saveRecordBtn = document.getElementById("saveRecordBtn");
-  const openHistoryBtn = document.getElementById("openHistoryBtn");
-  const exportExcelBtn = document.getElementById("exportExcelBtn");
-  const exportPdfBtn = document.getElementById("exportPdfBtn");
-  const importInput = document.getElementById("importInput");
-
-  const historyModal = document.getElementById("historyModal");
-  const closeHistoryModal = document.getElementById("closeHistoryModal");
-  const historyList = document.getElementById("historyList");
-  const historySearch = document.getElementById("historySearch");
-  const historySort = document.getElementById("historySort");
-  const clearRecordsBtn = document.getElementById("clearRecordsBtn");
-
-  let currentQuestionIndex = 0;
-
-  const LS_KEY_SESSIONS = "dozn_interview_sessions_v2";
-  const LS_KEY_DRAFT = "dozn_interview_draft_v2";
-
-  function todayISO() {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  function safeText(v) {
-    return (v ?? "").toString().trim();
-  }
-
-  function escapeHtml(str) {
-    return safeText(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  function getSelectedContext() {
-    const role = roleSelect.value;
-    const comp = competencySelect.value;
-    const compData = window.interviewData?.[role]?.competencies?.[comp];
-    const sets = compData?.questionSets || [];
-    const qSet = sets?.[currentQuestionIndex] || null;
-    return { role, comp, compData, sets, qSet };
-  }
-
-  function getSessionKey() {
-    return [
-      safeText(candidateName.value),
-      safeText(candidateId.value),
-      safeText(interviewerName.value),
-      safeText(interviewDate.value),
-      safeText(roleSelect.value)
-    ].join("||");
-  }
-
-  function loadSessions() {
-    try {
-      const raw = localStorage.getItem(LS_KEY_SESSIONS);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveSessions(sessions) {
-    localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(sessions));
-  }
-
-  function saveDraft() {
-    const ctx = getSelectedContext();
-    const draft = {
-      candidateName: safeText(candidateName.value),
-      candidateId: safeText(candidateId.value),
-      interviewerName: safeText(interviewerName.value),
-      interviewDate: safeText(interviewDate.value),
-      role: ctx.role,
-      comp: ctx.comp,
-      score: safeText(scoreSelect.value),
-      memo: safeText(memoInput.value),
-      currentQuestionIndex
-    };
-    localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(draft));
-  }
-
-  function loadDraft() {
-    try {
-      const raw = localStorage.getItem(LS_KEY_DRAFT);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-
-      if (d?.candidateName) candidateName.value = d.candidateName;
-      if (d?.candidateId) candidateId.value = d.candidateId;
-      if (d?.interviewerName) interviewerName.value = d.interviewerName;
-      interviewDate.value = d?.interviewDate || todayISO();
-
-      return d;
-    } catch {
-      return;
-    }
-  }
-
-  function initRoleOptions() {
-    roleSelect.innerHTML = "";
-    const roles = Object.keys(window.interviewData || {});
-    roles.forEach((role) => {
-      const opt = document.createElement("option");
-      opt.value = role;
-      opt.textContent = role;
-      roleSelect.appendChild(opt);
-    });
-  }
-
-  function updateCompetencyOptions() {
-    const selectedRole = roleSelect.value;
-    competencySelect.innerHTML = "";
-    if (!selectedRole) return;
-
-    const competencies = Object.keys(window.interviewData[selectedRole].competencies);
-    competencies.forEach((comp) => {
-      const opt = document.createElement("option");
-      opt.value = comp;
-      opt.textContent = comp;
-      competencySelect.appendChild(opt);
-    });
-
-    currentQuestionIndex = 0;
-    loadSavedEvaluationToForm();
-  }
-
-  function validateQuestionIndex() {
-    const { sets } = getSelectedContext();
-    if (!sets.length) {
-      currentQuestionIndex = 0;
-      return;
-    }
-    if (currentQuestionIndex < 0) currentQuestionIndex = 0;
-    if (currentQuestionIndex > sets.length - 1) currentQuestionIndex = sets.length - 1;
-  }
-
-  function renderContent() {
-    const { role, comp, compData, sets, qSet } = getSelectedContext();
-    validateQuestionIndex();
-
-    if (!role || !comp || !compData || !sets.length) {
-      contentArea.innerHTML = "";
-      return;
-    }
-
-    const currentSet = sets[currentQuestionIndex];
-    contentArea.innerHTML = "";
-
-    const defCard = document.createElement("div");
-    defCard.className = "rounded-2xl bg-white p-4 shadow-sm border border-slate-200";
-    defCard.innerHTML = `
-      <h2 class="text-lg font-semibold text-slate-900 mb-1">[${escapeHtml(role)}] ${escapeHtml(comp)}</h2>
-      <p class="text-sm text-slate-700 mb-2">${escapeHtml(compData.definition)}</p>
-      <p class="text-xs text-slate-500">질문 세트: ${currentQuestionIndex + 1} / ${sets.length}</p>
-    `;
-    contentArea.appendChild(defCard);
-
-    const qCard = document.createElement("div");
-    qCard.className = "rounded-2xl bg-white p-4 shadow-sm border border-slate-200";
-    qCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-slate-900 mb-2">✅ 메인 질문</h3>
-      <p class="text-sm text-slate-800">${escapeHtml(currentSet.mainQuestion)}</p>
-    `;
-    contentArea.appendChild(qCard);
-
-    const fCard = document.createElement("div");
-    fCard.className = "rounded-2xl bg-white p-4 shadow-sm border border-slate-200";
-    fCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-slate-900 mb-2">🔎 꼬리질문 (더 깊이 파고들 때)</h3>
-      <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
-        ${(currentSet.followUps || []).map(q => `<li>${escapeHtml(q)}</li>`).join("")}
-      </ul>
-    `;
-    contentArea.appendChild(fCard);
-
-    const oCard = document.createElement("div");
-    oCard.className = "rounded-2xl bg-white p-4 shadow-sm border border-slate-200";
-    oCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-slate-900 mb-2">👀 관찰 포인트</h3>
-      <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
-        ${(currentSet.observationPoints || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-      </ul>
-    `;
-    contentArea.appendChild(oCard);
-
-    const sWrapper = document.createElement("div");
-    sWrapper.className = "grid gap-4 md:grid-cols-2";
-
-    const posCard = document.createElement("div");
-    posCard.className = "rounded-2xl bg-emerald-50 p-4 border border-emerald-200";
-    posCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-emerald-900 mb-2">💚 긍정 신호</h3>
-      <ul class="list-disc pl-5 space-y-1 text-sm text-emerald-900">
-        ${(currentSet.positiveSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-      </ul>
-    `;
-
-    const negCard = document.createElement("div");
-    negCard.className = "rounded-2xl bg-rose-50 p-4 border border-rose-200";
-    negCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-rose-900 mb-2">⚠️ 우려 신호</h3>
-      <ul class="list-disc pl-5 space-y-1 text-sm text-rose-900">
-        ${(currentSet.negativeSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-      </ul>
-    `;
-
-    sWrapper.appendChild(posCard);
-    sWrapper.appendChild(negCard);
-    contentArea.appendChild(sWrapper);
-
-    const levelCard = document.createElement("div");
-    levelCard.className = "rounded-2xl bg-white p-4 shadow-sm border border-slate-200";
-    levelCard.innerHTML = `
-      <h3 class="text-sm font-semibold text-slate-900 mb-2">📊 레벨 구분 기준 (주니어 vs 시니어)</h3>
-      <div class="grid gap-4 md:grid-cols-2 text-sm text-slate-800">
-        <div>
-          <div class="font-semibold mb-1">주니어 기대 행동</div>
-          <p>${escapeHtml(compData.levelCriteria?.junior || "-")}</p>
-        </div>
-        <div>
-          <div class="font-semibold mb-1">시니어 기대 행동</div>
-          <p>${escapeHtml(compData.levelCriteria?.senior || "-")}</p>
+    <!-- 후보자/면접 정보 -->
+    <section class="mb-6 grid gap-4 md:grid-cols-2">
+      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+        <h2 class="text-sm font-semibold text-slate-900 mb-3">🧑‍💼 후보자 정보</h2>
+        <div class="grid gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">후보자명</label>
+            <input id="candidateName" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                   placeholder="예: 홍길동" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">지원 포지션/메모(선택)</label>
+            <input id="candidateId" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                   placeholder="예: 포지션 및 참고사항 등" />
+          </div>
         </div>
       </div>
-    `;
-    contentArea.appendChild(levelCard);
 
-    prevQuestionBtn.disabled = currentQuestionIndex === 0;
-    nextQuestionBtn.disabled = currentQuestionIndex === sets.length - 1;
-
-    prevQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === 0);
-    nextQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === sets.length - 1);
-
-    saveDraft();
-  }
-
-  function openBehaviorModal() {
-    const { role, comp, compData } = getSelectedContext();
-    if (!role || !comp) return;
-
-    if (!compData?.behaviorIndicators) {
-      alert("이 역량의 행동지표 정보가 아직 없습니다.");
-      return;
-    }
-
-    const bi = compData.behaviorIndicators;
-    behaviorModalContent.innerHTML = `
-      <p class="font-semibold mb-1">${escapeHtml(comp)}</p>
-      <p class="text-slate-700 mb-2"><span class="font-semibold">정의 :</span> ${escapeHtml(bi.definition)}</p>
-      <ul class="list-disc pl-5 space-y-1">
-        ${bi.items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
-      </ul>
-    `;
-
-    behaviorModal.classList.remove("hidden");
-    behaviorModal.classList.add("flex");
-  }
-
-  function closeBehavior() {
-    behaviorModal.classList.add("hidden");
-    behaviorModal.classList.remove("flex");
-  }
-
-  function validateForSave() {
-    if (!safeText(candidateName.value)) return "후보자명을 입력해주세요.";
-    if (!safeText(interviewerName.value)) return "면접관명을 입력해주세요.";
-    if (!safeText(interviewDate.value)) return "면접일을 선택해주세요.";
-    const { role, comp } = getSelectedContext();
-    if (!role || !comp) return "직무/역량을 선택해주세요.";
-    if (!safeText(scoreSelect.value)) return "점수를 선택해주세요.";
-    return null;
-  }
-
-  function buildEvaluationRecord() {
-    const { role, comp, compData, sets, qSet } = getSelectedContext();
-
-    return {
-      competencyKey: `${role}__${comp}`,
-      role,
-      competency: comp,
-      competencyDefinition: compData?.definition || "",
-      questionSetIndex: currentQuestionIndex,
-      questionSetTotal: sets?.length || 0,
-      mainQuestion: qSet?.mainQuestion || "",
-      score: Number(scoreSelect.value),
-      memo: safeText(memoInput.value),
-      updatedAt: new Date().toISOString()
-    };
-  }
-
-  function saveCurrentRecord() {
-    const err = validateForSave();
-    if (err) {
-      alert(err);
-      return;
-    }
-
-    const sessions = loadSessions();
-    const sessionKey = getSessionKey();
-
-    let session = sessions.find(s => s.sessionKey === sessionKey);
-
-    if (!session) {
-      session = {
-        id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
-        sessionKey,
-        createdAt: new Date().toISOString(),
-        candidate: {
-          name: safeText(candidateName.value),
-          meta: safeText(candidateId.value)
-        },
-        interviewer: safeText(interviewerName.value),
-        date: safeText(interviewDate.value),
-        role: safeText(roleSelect.value),
-        evaluations: []
-      };
-      sessions.push(session);
-    }
-
-    const evaluation = buildEvaluationRecord();
-    const existingIndex = session.evaluations.findIndex(ev => ev.competencyKey === evaluation.competencyKey);
-
-    if (existingIndex >= 0) {
-      session.evaluations[existingIndex] = evaluation;
-    } else {
-      session.evaluations.push(evaluation);
-    }
-
-    session.updatedAt = new Date().toISOString();
-
-    saveSessions(sessions);
-    alert("✅ 현재 역량 평가가 후보자 면접 세션에 저장되었습니다.");
-    saveDraft();
-  }
-
-  function findCurrentSession() {
-    const sessions = loadSessions();
-    const sessionKey = getSessionKey();
-    return sessions.find(s => s.sessionKey === sessionKey);
-  }
-
-  function loadSavedEvaluationToForm() {
-    const { role, comp } = getSelectedContext();
-    if (!role || !comp) {
-      scoreSelect.value = "";
-      memoInput.value = "";
-      return;
-    }
-
-    const session = findCurrentSession();
-    if (!session) {
-      scoreSelect.value = "";
-      memoInput.value = "";
-      return;
-    }
-
-    const evaluation = session.evaluations.find(ev => ev.competencyKey === `${role}__${comp}`);
-    if (!evaluation) {
-      scoreSelect.value = "";
-      memoInput.value = "";
-      currentQuestionIndex = 0;
-      return;
-    }
-
-    scoreSelect.value = evaluation.score ? String(evaluation.score) : "";
-    memoInput.value = evaluation.memo || "";
-    currentQuestionIndex = typeof evaluation.questionSetIndex === "number" ? evaluation.questionSetIndex : 0;
-  }
-
-  function openHistory() {
-    renderHistory();
-    historyModal.classList.remove("hidden");
-    historyModal.classList.add("flex");
-  }
-
-  function closeHistory() {
-    historyModal.classList.add("hidden");
-    historyModal.classList.remove("flex");
-  }
-
-  function renderHistory() {
-    const q = safeText(historySearch.value).toLowerCase();
-    const sort = historySort.value;
-
-    let sessions = loadSessions();
-
-    sessions = sessions.filter(s => {
-      const evaluationBlob = (s.evaluations || [])
-        .map(ev => [ev.role, ev.competency, ev.mainQuestion, ev.memo, ev.score].join(" "))
-        .join(" ");
-
-      const blob = [
-        s?.candidate?.name,
-        s?.candidate?.meta,
-        s?.interviewer,
-        s?.role,
-        s?.date,
-        evaluationBlob
-      ].join(" ").toLowerCase();
-
-      return blob.includes(q);
-    });
-
-    sessions.sort((a, b) => {
-      const ta = new Date(a.updatedAt || a.createdAt).getTime();
-      const tb = new Date(b.updatedAt || b.createdAt).getTime();
-      return sort === "oldest" ? (ta - tb) : (tb - ta);
-    });
-
-    if (sessions.length === 0) {
-      historyList.innerHTML = `<div class="p-4 text-sm text-slate-600">저장된 기록이 없습니다.</div>`;
-      return;
-    }
-
-    historyList.innerHTML = sessions.map(s => {
-      const title = `${escapeHtml(s.candidate?.name || "-")} · ${escapeHtml(s.role || "-")}`;
-      const sub = `${escapeHtml(s.date || "-")} · 면접관: ${escapeHtml(s.interviewer || "-")} · 평가 역량 수: ${(s.evaluations || []).length}`;
-      const evaluationHtml = (s.evaluations || []).map(ev => `
-        <div class="rounded-xl bg-white border border-slate-200 p-3">
-          <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
-          <div class="text-xs text-slate-600 mt-1">점수: ${escapeHtml(String(ev.score ?? "-"))} / 질문세트 ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}</div>
-          <div class="text-xs text-slate-700 mt-2 font-medium">메인 질문</div>
-          <div class="text-sm text-slate-800">${escapeHtml(ev.mainQuestion || "-")}</div>
-          <div class="text-xs text-slate-700 mt-2 font-medium">메모</div>
-          <div class="text-sm text-slate-800 whitespace-pre-wrap">${escapeHtml(ev.memo || "(메모 없음)")}</div>
+      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+        <h2 class="text-sm font-semibold text-slate-900 mb-3">🧑‍⚖️ 면접관 정보</h2>
+        <div class="grid gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">면접관명</label>
+            <input id="interviewerName" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                   placeholder="예: 김더즌" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">면접일</label>
+            <input id="interviewDate" type="date"
+                   class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+          </div>
         </div>
-      `).join("");
+      </div>
+    </section>
 
-      return `
+    <!-- 선택 영역 -->
+    <section class="mb-6 grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
+        <select id="roleSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택</label>
+        <select id="competencySelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+      </div>
+    </section>
+
+    <!-- 버튼 영역 -->
+    <section class="mb-6 flex flex-wrap gap-3">
+      <button id="prevQuestionBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        ⬅️ 이전 질문
+      </button>
+
+      <button id="nextQuestionBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        ➡️ 다음 질문
+      </button>
+
+      <button id="behaviorBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        📋 이 역량의 행동지표 보기
+      </button>
+
+      <button id="saveRecordBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-900 text-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-800">
+        💾 현재 역량 평가 저장
+      </button>
+
+      <button id="openHistoryBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        🗂️ 저장 기록 보기
+      </button>
+
+      <button id="exportExcelBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        ⬇️ 면접 결과 내보내기(엑셀)
+      </button>
+
+      <button id="exportPdfBtn"
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
+        🖨️ 면접 결과 저장(PDF)
+      </button>
+
+      <label
+        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50 cursor-pointer">
+        ⬆️ 기록 불러오기(JSON)
+        <input id="importInput" type="file" accept="application/json" class="hidden" />
+      </label>
+    </section>
+
+    <!-- 현재 역량 평가 -->
+    <section class="mb-6 rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-900">⭐ 현재 선택 역량 평가</h2>
+          <p class="text-xs text-slate-500">같은 후보자에 대해 여러 역량 평가를 저장하면 하나의 면접 세션으로 누적됩니다.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-600">점수</span>
+          <select id="scoreSelect" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
+            <option value="">선택</option>
+            <option value="1">1 (우려)</option>
+            <option value="2">2</option>
+            <option value="3">3 (보통)</option>
+            <option value="4">4</option>
+            <option value="5">5 (강점)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="block text-xs font-medium text-slate-700 mb-1">면접관 메모</label>
+        <textarea id="memoInput" rows="3"
+          class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+          placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
+      </div>
+    </section>
+
+    <section id="contentArea" class="space-y-4"></section>
+  </div>
+
+  <!-- 행동지표 모달 -->
+  <div id="behaviorModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl border border-slate-200">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">이 역량의 행동지표</h2>
+        <button id="closeBehaviorModal" class="text-slate-500 hover:text-slate-800 text-sm">✕</button>
+      </div>
+      <div id="behaviorModalContent" class="text-sm text-slate-800 space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- 기록 모달 -->
+  <div id="historyModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-5 shadow-xl border border-slate-200">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-900">저장된 평가 기록</h2>
+        <div class="flex items-center gap-2">
+          <button id="clearRecordsBtn" class="text-xs px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50">
+            🧹 전체 삭제
+          </button>
+          <button id="closeHistoryModal" class="text-slate-500 hover:text-slate-800 text-sm">✕</button>
+        </div>
+      </div>
+
+      <div class="grid gap-3 md:grid-cols-3 mb-3">
+        <div class="md:col-span-2">
+          <input id="historySearch" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                 placeholder="검색: 후보자명/면접관/직무/역량 등" />
+        </div>
+        <div>
+          <select id="historySort" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+            <option value="newest">최신순</option>
+            <option value="oldest">오래된순</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="historyList" class="max-h-[55vh] overflow-auto border border-slate-200 rounded-xl"></div>
+    </div>
+  </div>
+
+  <!-- 데이터 분리 파일 -->
+  <script src="interview-data.js"></script>
+
+  <script>
+    const roleSelect = document.getElementById("roleSelect");
+    const competencySelect = document.getElementById("competencySelect");
+    const contentArea = document.getElementById("contentArea");
+
+    const behaviorBtn = document.getElementById("behaviorBtn");
+    const prevQuestionBtn = document.getElementById("prevQuestionBtn");
+    const nextQuestionBtn = document.getElementById("nextQuestionBtn");
+
+    const behaviorModal = document.getElementById("behaviorModal");
+    const behaviorModalContent = document.getElementById("behaviorModalContent");
+    const closeBehaviorModal = document.getElementById("closeBehaviorModal");
+
+    const candidateName = document.getElementById("candidateName");
+    const candidateId = document.getElementById("candidateId");
+    const interviewerName = document.getElementById("interviewerName");
+    const interviewDate = document.getElementById("interviewDate");
+    const scoreSelect = document.getElementById("scoreSelect");
+    const memoInput = document.getElementById("memoInput");
+
+    const saveRecordBtn = document.getElementById("saveRecordBtn");
+    const openHistoryBtn = document.getElementById("openHistoryBtn");
+    const exportExcelBtn = document.getElementById("exportExcelBtn");
+    const exportPdfBtn = document.getElementById("exportPdfBtn");
+    const importInput = document.getElementById("importInput");
+
+    const historyModal = document.getElementById("historyModal");
+    const closeHistoryModal = document.getElementById("closeHistoryModal");
+    const historyList = document.getElementById("historyList");
+    const historySearch = document.getElementById("historySearch");
+    const historySort = document.getElementById("historySort");
+    const clearRecordsBtn = document.getElementById("clearRecordsBtn");
+
+    let currentQuestionIndex = 0;
+
+    const LS_KEY_SESSIONS = "dozn_interview_sessions_v2";
+    const LS_KEY_DRAFT = "dozn_interview_draft_v2";
+
+    function todayISO() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function safeText(v) {
+      return (v ?? "").toString().trim();
+    }
+
+    function escapeHtml(str) {
+      return safeText(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function getSelectedContext() {
+      const role = roleSelect?.value || "";
+      const comp = competencySelect?.value || "";
+      const compData = window.interviewData?.[role]?.competencies?.[comp];
+      const sets = compData?.questionSets || [];
+      const qSet = sets[currentQuestionIndex] || null;
+      return { role, comp, compData, sets, qSet };
+    }
+
+    function getSessionKey() {
+      return [
+        safeText(candidateName?.value),
+        safeText(candidateId?.value),
+        safeText(interviewerName?.value),
+        safeText(interviewDate?.value),
+        safeText(roleSelect?.value)
+      ].join("||");
+    }
+
+    function loadSessions() {
+      try {
+        const raw = localStorage.getItem(LS_KEY_SESSIONS);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveSessions(sessions) {
+      localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(sessions));
+    }
+
+    function saveDraft() {
+      const ctx = getSelectedContext();
+      const draft = {
+        candidateName: safeText(candidateName?.value),
+        candidateId: safeText(candidateId?.value),
+        interviewerName: safeText(interviewerName?.value),
+        interviewDate: safeText(interviewDate?.value),
+        role: ctx.role,
+        comp: ctx.comp,
+        score: safeText(scoreSelect?.value),
+        memo: safeText(memoInput?.value),
+        currentQuestionIndex
+      };
+      localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(draft));
+    }
+
+    function loadDraft() {
+      try {
+        const raw = localStorage.getItem(LS_KEY_DRAFT);
+        if (!raw) return null;
+        const d = JSON.parse(raw);
+
+        if (candidateName && d?.candidateName) candidateName.value = d.candidateName;
+        if (candidateId && d?.candidateId) candidateId.value = d.candidateId;
+        if (interviewerName && d?.interviewerName) interviewerName.value = d.interviewerName;
+        if (interviewDate) interviewDate.value = d?.interviewDate || todayISO();
+
+        return d;
+      } catch {
+        return null;
+      }
+    }
+
+    function initRoleOptions() {
+      if (!roleSelect) return;
+      roleSelect.innerHTML = "";
+      const roles = Object.keys(window.interviewData || {});
+      roles.forEach((role) => {
+        const opt = document.createElement("option");
+        opt.value = role;
+        opt.textContent = role;
+        roleSelect.appendChild(opt);
+      });
+    }
+
+    function updateCompetencyOptions() {
+      const selectedRole = roleSelect?.value;
+      if (!competencySelect) return;
+
+      competencySelect.innerHTML = "";
+      if (!selectedRole || !window.interviewData?.[selectedRole]?.competencies) return;
+
+      const competencies = Object.keys(window.interviewData[selectedRole].competencies);
+      competencies.forEach((comp) => {
+        const opt = document.createElement("option");
+        opt.value = comp;
+        opt.textContent = comp;
+        competencySelect.appendChild(opt);
+      });
+
+      currentQuestionIndex = 0;
+    }
+
+    function validateQuestionIndex() {
+      const { sets } = getSelectedContext();
+      if (!sets.length) {
+        currentQuestionIndex = 0;
+        return;
+      }
+      if (currentQuestionIndex < 0) currentQuestionIndex = 0;
+      if (currentQuestionIndex > sets.length - 1) currentQuestionIndex = sets.length - 1;
+    }
+
+    function findCurrentSession() {
+      const sessions = loadSessions();
+      const sessionKey = getSessionKey();
+      return sessions.find(s => s.sessionKey === sessionKey);
+    }
+
+    function loadSavedEvaluationToForm() {
+      const { role, comp } = getSelectedContext();
+      if (!role || !comp) {
+        if (scoreSelect) scoreSelect.value = "";
+        if (memoInput) memoInput.value = "";
+        return;
+      }
+
+      const session = findCurrentSession();
+      if (!session) {
+        if (scoreSelect) scoreSelect.value = "";
+        if (memoInput) memoInput.value = "";
+        return;
+      }
+
+      const evaluation = session.evaluations?.find(ev => ev.competencyKey === `${role}__${comp}`);
+      if (!evaluation) {
+        if (scoreSelect) scoreSelect.value = "";
+        if (memoInput) memoInput.value = "";
+        currentQuestionIndex = 0;
+        return;
+      }
+
+      if (scoreSelect) scoreSelect.value = evaluation.score ? String(evaluation.score) : "";
+      if (memoInput) memoInput.value = evaluation.memo || "";
+      currentQuestionIndex = typeof evaluation.questionSetIndex === "number" ? evaluation.questionSetIndex : 0;
+    }
+
+    function renderContent() {
+      if (!contentArea) return;
+
+      validateQuestionIndex();
+      const { role, comp, compData, sets } = getSelectedContext();
+      const qSet = sets[currentQuestionIndex];
+
+      if (!role || !comp || !compData || !qSet) {
+        contentArea.innerHTML = `
+          <div class="rounded-2xl bg-white p-6 shadow-sm border border-slate-200 text-sm text-slate-600">
+            표시할 면접 질문 데이터가 없습니다. <br />
+            interview-data.js 파일에 직무/역량 데이터가 정상적으로 들어있는지 확인해주세요.
+          </div>
+        `;
+        return;
+      }
+
+      contentArea.innerHTML = `
+        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+          <h2 class="text-lg font-semibold text-slate-900 mb-1">[${escapeHtml(role)}] ${escapeHtml(comp)}</h2>
+          <p class="text-sm text-slate-700 mb-2">${escapeHtml(compData.definition || "")}</p>
+          <p class="text-xs text-slate-500">질문 세트: ${currentQuestionIndex + 1} / ${sets.length}</p>
+        </div>
+
+        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+          <h3 class="text-sm font-semibold text-slate-900 mb-2">✅ 메인 질문</h3>
+          <p class="text-sm text-slate-800">${escapeHtml(qSet.mainQuestion || "")}</p>
+        </div>
+
+        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+          <h3 class="text-sm font-semibold text-slate-900 mb-2">🔎 꼬리질문 (더 깊이 파고들 때)</h3>
+          <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
+            ${(qSet.followUps || []).map(q => `<li>${escapeHtml(q)}</li>`).join("")}
+          </ul>
+        </div>
+
+        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+          <h3 class="text-sm font-semibold text-slate-900 mb-2">👀 관찰 포인트</h3>
+          <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
+            ${(qSet.observationPoints || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+          </ul>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-2xl bg-emerald-50 p-4 border border-emerald-200">
+            <h3 class="text-sm font-semibold text-emerald-900 mb-2">💚 긍정 신호</h3>
+            <ul class="list-disc pl-5 space-y-1 text-sm text-emerald-900">
+              ${(qSet.positiveSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+            </ul>
+          </div>
+
+          <div class="rounded-2xl bg-rose-50 p-4 border border-rose-200">
+            <h3 class="text-sm font-semibold text-rose-900 mb-2">⚠️ 우려 신호</h3>
+            <ul class="list-disc pl-5 space-y-1 text-sm text-rose-900">
+              ${(qSet.negativeSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+            </ul>
+          </div>
+        </div>
+
+        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
+          <h3 class="text-sm font-semibold text-slate-900 mb-2">📊 레벨 구분 기준 (주니어 vs 시니어)</h3>
+          <div class="grid gap-4 md:grid-cols-2 text-sm text-slate-800">
+            <div>
+              <div class="font-semibold mb-1">주니어 기대 행동</div>
+              <p>${escapeHtml(compData.levelCriteria?.junior || "-")}</p>
+            </div>
+            <div>
+              <div class="font-semibold mb-1">시니어 기대 행동</div>
+              <p>${escapeHtml(compData.levelCriteria?.senior || "-")}</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (prevQuestionBtn) {
+        prevQuestionBtn.disabled = currentQuestionIndex === 0;
+        prevQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === 0);
+      }
+      if (nextQuestionBtn) {
+        nextQuestionBtn.disabled = currentQuestionIndex === sets.length - 1;
+        nextQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === sets.length - 1);
+      }
+
+      saveDraft();
+    }
+
+    function openBehaviorModal() {
+      const { comp, compData } = getSelectedContext();
+      if (!comp || !compData?.behaviorIndicators) {
+        alert("이 역량의 행동지표 정보가 아직 없습니다.");
+        return;
+      }
+
+      const bi = compData.behaviorIndicators;
+      behaviorModalContent.innerHTML = `
+        <p class="font-semibold mb-1">${escapeHtml(comp)}</p>
+        <p class="text-slate-700 mb-2"><span class="font-semibold">정의 :</span> ${escapeHtml(bi.definition || "")}</p>
+        <ul class="list-disc pl-5 space-y-1">
+          ${(bi.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+        </ul>
+      `;
+
+      behaviorModal.classList.remove("hidden");
+      behaviorModal.classList.add("flex");
+    }
+
+    function closeBehavior() {
+      behaviorModal.classList.add("hidden");
+      behaviorModal.classList.remove("flex");
+    }
+
+    function validateForSave() {
+      if (!safeText(candidateName?.value)) return "후보자명을 입력해주세요.";
+      if (!safeText(interviewerName?.value)) return "면접관명을 입력해주세요.";
+      if (!safeText(interviewDate?.value)) return "면접일을 선택해주세요.";
+
+      const { role, comp } = getSelectedContext();
+      if (!role || !comp) return "직무/역량을 선택해주세요.";
+      if (!safeText(scoreSelect?.value)) return "점수를 선택해주세요.";
+
+      return null;
+    }
+
+    function buildEvaluationRecord() {
+      const { role, comp, compData, sets, qSet } = getSelectedContext();
+
+      return {
+        competencyKey: `${role}__${comp}`,
+        role,
+        competency: comp,
+        competencyDefinition: compData?.definition || "",
+        questionSetIndex: currentQuestionIndex,
+        questionSetTotal: sets?.length || 0,
+        mainQuestion: qSet?.mainQuestion || "",
+        score: Number(scoreSelect.value),
+        memo: safeText(memoInput?.value),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    function saveCurrentRecord() {
+      const err = validateForSave();
+      if (err) {
+        alert(err);
+        return;
+      }
+
+      const sessions = loadSessions();
+      const sessionKey = getSessionKey();
+
+      let session = sessions.find(s => s.sessionKey === sessionKey);
+
+      if (!session) {
+        session = {
+          id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
+          sessionKey,
+          createdAt: new Date().toISOString(),
+          candidate: {
+            name: safeText(candidateName.value),
+            meta: safeText(candidateId.value)
+          },
+          interviewer: safeText(interviewerName.value),
+          date: safeText(interviewDate.value),
+          role: safeText(roleSelect.value),
+          evaluations: []
+        };
+        sessions.push(session);
+      }
+
+      const evaluation = buildEvaluationRecord();
+      const existingIndex = session.evaluations.findIndex(ev => ev.competencyKey === evaluation.competencyKey);
+
+      if (existingIndex >= 0) {
+        session.evaluations[existingIndex] = evaluation;
+      } else {
+        session.evaluations.push(evaluation);
+      }
+
+      session.updatedAt = new Date().toISOString();
+      saveSessions(sessions);
+
+      alert("✅ 현재 역량 평가가 저장되었습니다.");
+      saveDraft();
+    }
+
+    function renderHistory() {
+      const q = safeText(historySearch?.value).toLowerCase();
+      const sort = historySort?.value || "newest";
+
+      let sessions = loadSessions();
+
+      sessions = sessions.filter(s => {
+        const evaluationBlob = (s.evaluations || [])
+          .map(ev => [ev.role, ev.competency, ev.mainQuestion, ev.memo, ev.score].join(" "))
+          .join(" ");
+
+        const blob = [
+          s?.candidate?.name,
+          s?.candidate?.meta,
+          s?.interviewer,
+          s?.role,
+          s?.date,
+          evaluationBlob
+        ].join(" ").toLowerCase();
+
+        return blob.includes(q);
+      });
+
+      sessions.sort((a, b) => {
+        const ta = new Date(a.updatedAt || a.createdAt).getTime();
+        const tb = new Date(b.updatedAt || b.createdAt).getTime();
+        return sort === "oldest" ? ta - tb : tb - ta;
+      });
+
+      if (!historyList) return;
+
+      if (sessions.length === 0) {
+        historyList.innerHTML = `<div class="p-4 text-sm text-slate-600">저장된 기록이 없습니다.</div>`;
+        return;
+      }
+
+      historyList.innerHTML = sessions.map(s => `
         <details class="border-b border-slate-200 p-4">
           <summary class="cursor-pointer">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <div class="text-sm font-semibold text-slate-900">${title}</div>
-                <div class="text-xs text-slate-600 mt-1">${sub}</div>
+                <div class="text-sm font-semibold text-slate-900">${escapeHtml(s.candidate?.name || "-")} · ${escapeHtml(s.role || "-")}</div>
+                <div class="text-xs text-slate-600 mt-1">${escapeHtml(s.date || "-")} · 면접관: ${escapeHtml(s.interviewer || "-")} · 평가 역량 수: ${(s.evaluations || []).length}</div>
               </div>
-              <div class="text-xs text-slate-500">최종 수정: ${new Date(s.updatedAt || s.createdAt).toLocaleString()}</div>
             </div>
           </summary>
           <div class="mt-3 grid gap-3">
-            ${evaluationHtml}
+            ${(s.evaluations || []).map(ev => `
+              <div class="rounded-xl bg-white border border-slate-200 p-3">
+                <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
+                <div class="text-xs text-slate-600 mt-1">점수: ${escapeHtml(String(ev.score ?? "-"))}</div>
+                <div class="text-xs text-slate-700 mt-2 font-medium">메인 질문</div>
+                <div class="text-sm text-slate-800">${escapeHtml(ev.mainQuestion || "-")}</div>
+                <div class="text-xs text-slate-700 mt-2 font-medium">메모</div>
+                <div class="text-sm text-slate-800 whitespace-pre-wrap">${escapeHtml(ev.memo || "(메모 없음)")}</div>
+              </div>
+            `).join("")}
           </div>
         </details>
-      `;
-    }).join("");
-  }
-
-  function clearAllRecords() {
-    const ok = confirm("저장된 모든 면접 세션 기록을 삭제할까요? 이 작업은 되돌릴 수 없습니다.");
-    if (!ok) return;
-    localStorage.removeItem(LS_KEY_SESSIONS);
-    renderHistory();
-  }
-
-  function exportCurrentSessionToExcel() {
-    const session = findCurrentSession();
-    if (!session) {
-      alert("현재 후보자/면접 정보로 저장된 세션이 없습니다. 먼저 평가를 저장해주세요.");
-      return;
+      `).join("");
     }
 
-    const rows = (session.evaluations || []).map((ev, idx) => ({
-      순번: idx + 1,
-      후보자명: session.candidate?.name || "",
-      지원포지션_메모: session.candidate?.meta || "",
-      면접관: session.interviewer || "",
-      면접일: session.date || "",
-      직무: ev.role || "",
-      역량: ev.competency || "",
-      점수: ev.score ?? "",
-      질문세트: `${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || ""}`,
-      메인질문: ev.mainQuestion || "",
-      메모: ev.memo || "",
-      수정시각: ev.updatedAt ? new Date(ev.updatedAt).toLocaleString() : ""
-    }));
-
-    if (!rows.length) {
-      alert("현재 세션에 저장된 역량 평가가 없습니다.");
-      return;
+    function openHistory() {
+      renderHistory();
+      historyModal.classList.remove("hidden");
+      historyModal.classList.add("flex");
     }
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(rows);
-
-    const colWidths = [
-      { wch: 6 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
-      { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 12 }, { wch: 40 },
-      { wch: 50 }, { wch: 20 }
-    ];
-    ws["!cols"] = colWidths;
-
-    XLSX.utils.book_append_sheet(wb, ws, "면접평가");
-    XLSX.writeFile(wb, `interview_session_${safeText(session.candidate?.name || "candidate")}_${session.date || todayISO()}.xlsx`);
-  }
-
-  function exportCurrentSessionToPdf() {
-    const session = findCurrentSession();
-    if (!session) {
-      alert("현재 후보자/면접 정보로 저장된 세션이 없습니다. 먼저 평가를 저장해주세요.");
-      return;
+    function closeHistory() {
+      historyModal.classList.add("hidden");
+      historyModal.classList.remove("flex");
     }
 
-    if (!(session.evaluations || []).length) {
-      alert("현재 세션에 저장된 역량 평가가 없습니다.");
-      return;
+    function clearAllRecords() {
+      const ok = confirm("저장된 모든 면접 세션 기록을 삭제할까요?");
+      if (!ok) return;
+      localStorage.removeItem(LS_KEY_SESSIONS);
+      renderHistory();
     }
 
-    const printWindow = window.open("", "_blank", "width=900,height=1000");
-    const cards = session.evaluations.map((ev, idx) => `
-      <div class="card">
-        <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
-        <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
-        <p><strong>점수:</strong> ${escapeHtml(String(ev.score ?? "-"))}</p>
-        <p><strong>질문세트:</strong> ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}</p>
-        <p><strong>메인 질문:</strong> ${escapeHtml(ev.mainQuestion || "-")}</p>
-        <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
-      </div>
-    `).join("");
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>면접 평가 결과</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
-            h1 { font-size: 24px; margin-bottom: 8px; }
-            h2 { font-size: 16px; margin-bottom: 20px; color: #475569; }
-            .meta { margin-bottom: 24px; line-height: 1.7; }
-            .card {
-              border: 1px solid #cbd5e1;
-              border-radius: 12px;
-              padding: 16px;
-              margin-bottom: 16px;
-              page-break-inside: avoid;
-            }
-            .card h3 { margin: 0 0 10px 0; font-size: 18px; }
-            p { margin: 6px 0; line-height: 1.6; }
-          </style>
-        </head>
-        <body>
-          <h1>역량 기반 면접 평가 결과</h1>
-          <h2>${escapeHtml(session.candidate?.name || "-")}</h2>
-          <div class="meta">
-            <div><strong>지원 포지션/메모:</strong> ${escapeHtml(session.candidate?.meta || "-")}</div>
-            <div><strong>면접관:</strong> ${escapeHtml(session.interviewer || "-")}</div>
-            <div><strong>면접일:</strong> ${escapeHtml(session.date || "-")}</div>
-            <div><strong>직무:</strong> ${escapeHtml(session.role || "-")}</div>
-            <div><strong>평가 역량 수:</strong> ${(session.evaluations || []).length}</div>
-          </div>
-          ${cards}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  }
-
-  async function importRecordsFromFile(file) {
-    try {
-      const text = await file.text();
-      const payload = JSON.parse(text);
-
-      const imported = payload?.sessions || payload?.records;
-      if (!Array.isArray(imported)) {
-        alert("불러오기 실패: sessions 배열이 없습니다.");
+    function exportCurrentSessionToExcel() {
+      const session = findCurrentSession();
+      if (!session) {
+        alert("현재 후보자 기준 저장된 세션이 없습니다.");
         return;
       }
 
-      const existing = loadSessions();
-      const map = new Map(existing.map(s => [s.id, s]));
+      if (typeof XLSX === "undefined") {
+        alert("엑셀 라이브러리가 로드되지 않았습니다.");
+        return;
+      }
 
-      imported.forEach(s => {
-        if (s?.id && !map.has(s.id)) {
-          if (!Array.isArray(s.evaluations)) s.evaluations = [];
-          map.set(s.id, s);
+      const rows = (session.evaluations || []).map((ev, idx) => ({
+        순번: idx + 1,
+        후보자명: session.candidate?.name || "",
+        지원포지션_메모: session.candidate?.meta || "",
+        면접관: session.interviewer || "",
+        면접일: session.date || "",
+        직무: ev.role || "",
+        역량: ev.competency || "",
+        점수: ev.score ?? "",
+        질문세트: `${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || ""}`,
+        메인질문: ev.mainQuestion || "",
+        메모: ev.memo || ""
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws["!cols"] = [
+        { wch: 6 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+        { wch: 14 }, { wch: 16 }, { wch: 8 }, { wch: 12 }, { wch: 40 }, { wch: 50 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, "면접평가");
+      XLSX.writeFile(wb, `interview_session_${safeText(session.candidate?.name || "candidate")}_${session.date || todayISO()}.xlsx`);
+    }
+
+    function exportCurrentSessionToPdf() {
+      const session = findCurrentSession();
+      if (!session) {
+        alert("현재 후보자 기준 저장된 세션이 없습니다.");
+        return;
+      }
+
+      const cards = (session.evaluations || []).map((ev, idx) => `
+        <div class="card">
+          <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
+          <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
+          <p><strong>점수:</strong> ${escapeHtml(String(ev.score ?? "-"))}</p>
+          <p><strong>질문세트:</strong> ${Number(ev.questionSetIndex ?? 0) + 1}/${ev.questionSetTotal || "-"}</p>
+          <p><strong>메인 질문:</strong> ${escapeHtml(ev.mainQuestion || "-")}</p>
+          <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
+        </div>
+      `).join("");
+
+      const printWindow = window.open("", "_blank", "width=900,height=1000");
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>면접 평가 결과</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+              h1 { font-size: 24px; margin-bottom: 8px; }
+              h2 { font-size: 16px; margin-bottom: 20px; color: #475569; }
+              .meta { margin-bottom: 24px; line-height: 1.7; }
+              .card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid; }
+              .card h3 { margin: 0 0 10px 0; font-size: 18px; }
+              p { margin: 6px 0; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <h1>역량 기반 면접 평가 결과</h1>
+            <h2>${escapeHtml(session.candidate?.name || "-")}</h2>
+            <div class="meta">
+              <div><strong>지원 포지션/메모:</strong> ${escapeHtml(session.candidate?.meta || "-")}</div>
+              <div><strong>면접관:</strong> ${escapeHtml(session.interviewer || "-")}</div>
+              <div><strong>면접일:</strong> ${escapeHtml(session.date || "-")}</div>
+              <div><strong>직무:</strong> ${escapeHtml(session.role || "-")}</div>
+            </div>
+            ${cards}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+
+    async function importRecordsFromFile(file) {
+      try {
+        const text = await file.text();
+        const payload = JSON.parse(text);
+        const imported = payload?.sessions || payload?.records;
+
+        if (!Array.isArray(imported)) {
+          alert("불러오기 실패: sessions 배열이 없습니다.");
+          return;
         }
+
+        const existing = loadSessions();
+        const map = new Map(existing.map(s => [s.id, s]));
+
+        imported.forEach(s => {
+          if (s?.id && !map.has(s.id)) {
+            if (!Array.isArray(s.evaluations)) s.evaluations = [];
+            map.set(s.id, s);
+          }
+        });
+
+        saveSessions(Array.from(map.values()));
+        alert(`✅ 불러오기 완료! (총 ${map.size}건)`);
+        renderHistory();
+      } catch {
+        alert("불러오기 실패: 파일 형식이 올바르지 않습니다.");
+      }
+    }
+
+    function goPrevQuestion() {
+      const { sets } = getSelectedContext();
+      if (!sets.length) return;
+      if (currentQuestionIndex > 0) {
+        currentQuestionIndex -= 1;
+        renderContent();
+      }
+    }
+
+    function goNextQuestion() {
+      const { sets } = getSelectedContext();
+      if (!sets.length) return;
+      if (currentQuestionIndex < sets.length - 1) {
+        currentQuestionIndex += 1;
+        renderContent();
+      }
+    }
+
+    if (roleSelect) {
+      roleSelect.addEventListener("change", () => {
+        updateCompetencyOptions();
+        currentQuestionIndex = 0;
+        loadSavedEvaluationToForm();
+        renderContent();
       });
-
-      saveSessions(Array.from(map.values()));
-      alert(`✅ 불러오기 완료! (총 ${map.size}건)`);
-      renderHistory();
-    } catch {
-      alert("불러오기 실패: 파일 형식이 올바르지 않습니다.");
     }
-  }
 
-  function goPrevQuestion() {
-    const { sets } = getSelectedContext();
-    if (!sets.length) return;
-    if (currentQuestionIndex > 0) {
-      currentQuestionIndex -= 1;
-      renderContent();
+    if (competencySelect) {
+      competencySelect.addEventListener("change", () => {
+        currentQuestionIndex = 0;
+        loadSavedEvaluationToForm();
+        renderContent();
+      });
     }
-  }
 
-  function goNextQuestion() {
-    const { sets } = getSelectedContext();
-    if (!sets.length) return;
-    if (currentQuestionIndex < sets.length - 1) {
-      currentQuestionIndex += 1;
-      renderContent();
+    if (prevQuestionBtn) prevQuestionBtn.addEventListener("click", goPrevQuestion);
+    if (nextQuestionBtn) nextQuestionBtn.addEventListener("click", goNextQuestion);
+    if (behaviorBtn) behaviorBtn.addEventListener("click", openBehaviorModal);
+
+    if (closeBehaviorModal) closeBehaviorModal.addEventListener("click", closeBehavior);
+    if (behaviorModal) {
+      behaviorModal.addEventListener("click", (e) => {
+        if (e.target === behaviorModal) closeBehavior();
+      });
     }
-  }
 
-  roleSelect.addEventListener("change", () => {
+    [candidateName, candidateId, interviewerName, interviewDate].forEach(el => {
+      if (!el) return;
+      el.addEventListener("input", () => {
+        loadSavedEvaluationToForm();
+        saveDraft();
+      });
+      el.addEventListener("change", () => {
+        loadSavedEvaluationToForm();
+        saveDraft();
+      });
+    });
+
+    [scoreSelect, memoInput].forEach(el => {
+      if (!el) return;
+      el.addEventListener("input", saveDraft);
+      el.addEventListener("change", saveDraft);
+    });
+
+    if (saveRecordBtn) saveRecordBtn.addEventListener("click", saveCurrentRecord);
+    if (openHistoryBtn) openHistoryBtn.addEventListener("click", openHistory);
+    if (closeHistoryModal) closeHistoryModal.addEventListener("click", closeHistory);
+
+    if (historyModal) {
+      historyModal.addEventListener("click", (e) => {
+        if (e.target === historyModal) closeHistory();
+      });
+    }
+
+    if (historySearch) historySearch.addEventListener("input", renderHistory);
+    if (historySort) historySort.addEventListener("change", renderHistory);
+    if (clearRecordsBtn) clearRecordsBtn.addEventListener("click", clearAllRecords);
+
+    if (exportExcelBtn) exportExcelBtn.addEventListener("click", exportCurrentSessionToExcel);
+    if (exportPdfBtn) exportPdfBtn.addEventListener("click", exportCurrentSessionToPdf);
+
+    if (importInput) {
+      importInput.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (file) importRecordsFromFile(file);
+        e.target.value = "";
+      });
+    }
+
+    if (interviewDate && !interviewDate.value) {
+      interviewDate.value = todayISO();
+    }
+
+    const draft = loadDraft();
+
+    initRoleOptions();
+
+    if (draft?.role && window.interviewData?.[draft.role] && roleSelect) {
+      roleSelect.value = draft.role;
+    }
+
     updateCompetencyOptions();
-    currentQuestionIndex = 0;
+
+    if (draft?.comp && window.interviewData?.[roleSelect?.value]?.competencies?.[draft.comp] && competencySelect) {
+      competencySelect.value = draft.comp;
+    }
+
+    if (draft?.score && scoreSelect) scoreSelect.value = draft.score;
+    if (draft?.memo && memoInput) memoInput.value = draft.memo;
+    if (typeof draft?.currentQuestionIndex === "number") currentQuestionIndex = draft.currentQuestionIndex;
+
     loadSavedEvaluationToForm();
     renderContent();
-  });
-
-  competencySelect.addEventListener("change", () => {
-    currentQuestionIndex = 0;
-    loadSavedEvaluationToForm();
-    renderContent();
-  });
-
-  prevQuestionBtn.addEventListener("click", goPrevQuestion);
-  nextQuestionBtn.addEventListener("click", goNextQuestion);
-  behaviorBtn.addEventListener("click", openBehaviorModal);
-
-  closeBehaviorModal.addEventListener("click", closeBehavior);
-  behaviorModal.addEventListener("click", (e) => {
-    if (e.target === behaviorModal) closeBehavior();
-  });
-
-  [candidateName, candidateId, interviewerName, interviewDate].forEach(el => {
-    el.addEventListener("input", () => {
-      loadSavedEvaluationToForm();
-      saveDraft();
-    });
-    el.addEventListener("change", () => {
-      loadSavedEvaluationToForm();
-      saveDraft();
-    });
-  });
-
-  [scoreSelect, memoInput].forEach(el => {
-    el.addEventListener("input", saveDraft);
-    el.addEventListener("change", saveDraft);
-  });
-
-  saveRecordBtn.addEventListener("click", saveCurrentRecord);
-
-  openHistoryBtn.addEventListener("click", openHistory);
-  closeHistoryModal.addEventListener("click", closeHistory);
-  historyModal.addEventListener("click", (e) => {
-    if (e.target === historyModal) closeHistory();
-  });
-
-  historySearch.addEventListener("input", renderHistory);
-  historySort.addEventListener("change", renderHistory);
-  clearRecordsBtn.addEventListener("click", clearAllRecords);
-
-  exportExcelBtn.addEventListener("click", exportCurrentSessionToExcel);
-  exportPdfBtn.addEventListener("click", exportCurrentSessionToPdf);
-
-  importInput.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (file) importRecordsFromFile(file);
-    e.target.value = "";
-  });
-
-  interviewDate.value = todayISO();
-
-  const draft = loadDraft();
-
-  initRoleOptions();
-
-  if (draft?.role && window.interviewData?.[draft.role]) {
-    roleSelect.value = draft.role;
-  }
-
-  updateCompetencyOptions();
-
-  if (draft?.comp && window.interviewData?.[roleSelect.value]?.competencies?.[draft.comp]) {
-    competencySelect.value = draft.comp;
-  }
-
-  if (draft?.score) scoreSelect.value = draft.score;
-  if (draft?.memo) memoInput.value = draft.memo;
-  if (typeof draft?.currentQuestionIndex === "number") currentQuestionIndex = draft.currentQuestionIndex;
-
-  loadSavedEvaluationToForm();
-  renderContent();
-</script>
+  </script>
+</body>
+</html>
