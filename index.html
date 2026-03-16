@@ -51,18 +51,40 @@
       </div>
     </section>
 
-    <!-- 입력란 묶음: 역량평가 + 총평 -->
+    <!-- 입력란 묶음: 역량평가 + 최종 총평 -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
       <!-- 역량평가 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h2 class="text-sm font-semibold text-slate-900">⭐ 역량 평가</h2>
-            <p class="text-xs text-slate-500">현재 선택한 역량에 대한 점수와 메모를 작성합니다.</p>
+            <p class="text-xs text-slate-500">상단 칸반 안에서 역량을 바꿔가며 평가를 이어서 작성할 수 있습니다.</p>
           </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600">평가 점수</span>
-            <select id="scoreSelect" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
+        </div>
+
+        <div class="mt-3 grid gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">평가 역량 선택</label>
+            <div class="flex items-center gap-2">
+              <button id="evalPrevBtn"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-sm shadow-sm hover:bg-slate-50"
+                type="button">
+                ◀
+              </button>
+
+              <select id="evalCompetencySelect" class="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
+
+              <button id="evalNextBtn"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-sm shadow-sm hover:bg-slate-50"
+                type="button">
+                ▶
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">평가 점수</label>
+            <select id="scoreSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
               <option value="">선택</option>
               <option value="1">부족함</option>
               <option value="2">개선필요</option>
@@ -71,25 +93,25 @@
               <option value="5">탁월</option>
             </select>
           </div>
-        </div>
 
-        <div class="mt-3">
-          <label class="block text-xs font-medium text-slate-700 mb-1">면접관 메모</label>
-          <textarea id="memoInput" rows="6"
-            class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
+          <div>
+            <label class="block text-xs font-medium text-slate-700 mb-1">면접관 메모</label>
+            <textarea id="memoInput" rows="7"
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
+          </div>
         </div>
       </div>
 
-      <!-- 총평 -->
+      <!-- 최종 총평 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h2 class="text-sm font-semibold text-slate-900">🧾 총평</h2>
-            <p class="text-xs text-slate-500">후보자 전체에 대한 최종 의견과 결과를 남깁니다.</p>
+            <h2 class="text-sm font-semibold text-slate-900">🧾 최종 총평</h2>
+            <p class="text-xs text-slate-500">후보자 전체에 대한 최종 의견과 판정을 남깁니다.</p>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600">최종 결과</span>
+            <span class="text-xs text-slate-600">최종 판정</span>
             <select id="finalDecision" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
               <option value="">선택</option>
               <option value="추천">추천</option>
@@ -100,8 +122,8 @@
         </div>
 
         <div class="mt-3">
-          <label class="block text-xs font-medium text-slate-700 mb-1">총평 메모</label>
-          <textarea id="finalComment" rows="6"
+          <label class="block text-xs font-medium text-slate-700 mb-1">최종 총평 메모</label>
+          <textarea id="finalComment" rows="10"
             class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             placeholder="후보자 전체 강점/우려점/추가 확인 필요사항 등을 적어주세요."></textarea>
         </div>
@@ -110,9 +132,9 @@
 
     <!-- 저장/기록/내보내기 버튼 -->
     <section class="mb-6 flex flex-wrap gap-3">
-      <button id="saveEvaluationBtn"
+      <button id="saveSessionBtn"
         class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-900 text-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-800">
-        💾 현재 역량 평가 저장
+        💾 면접 결과 저장
       </button>
 
       <button id="openHistoryBtn"
@@ -131,14 +153,14 @@
       </button>
     </section>
 
-    <!-- 직무/역량 선택 -->
+    <!-- 직무/역량 선택 (질문 보기용) -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
         <select id="roleSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
       </div>
       <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택</label>
+        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택 (질문 보기용)</label>
         <select id="competencySelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
       </div>
     </section>
@@ -212,10 +234,14 @@
     const competencySelect = document.getElementById("competencySelect");
     const contentArea = document.getElementById("contentArea");
 
+    const evalCompetencySelect = document.getElementById("evalCompetencySelect");
+    const evalPrevBtn = document.getElementById("evalPrevBtn");
+    const evalNextBtn = document.getElementById("evalNextBtn");
+
     const prevQuestionBtn = document.getElementById("prevQuestionBtn");
     const nextQuestionBtn = document.getElementById("nextQuestionBtn");
     const behaviorBtn = document.getElementById("behaviorBtn");
-    const saveEvaluationBtn = document.getElementById("saveEvaluationBtn");
+    const saveSessionBtn = document.getElementById("saveSessionBtn");
     const openHistoryBtn = document.getElementById("openHistoryBtn");
     const exportExcelBtn = document.getElementById("exportExcelBtn");
     const exportPdfBtn = document.getElementById("exportPdfBtn");
@@ -241,9 +267,11 @@
     const clearRecordsBtn = document.getElementById("clearRecordsBtn");
 
     let currentQuestionIndex = 0;
+    let currentEvalCompetency = "";
+    let draftEvaluations = {};
 
-    const LS_KEY_SESSIONS = "dozn_interview_sessions_v4";
-    const LS_KEY_DRAFT = "dozn_interview_draft_v4";
+    const LS_KEY_SESSIONS = "dozn_interview_sessions_v5";
+    const LS_KEY_DRAFT = "dozn_interview_draft_v5";
 
     function todayISO() {
       const d = new Date();
@@ -275,13 +303,21 @@
       return map[Number(score)] || "-";
     }
 
-    function getSelectedContext() {
+    function getRoleCompetencies(role) {
+      return Object.keys(window.interviewData?.[role]?.competencies || {});
+    }
+
+    function getQuestionContext() {
       const role = roleSelect.value;
       const comp = competencySelect.value;
       const compData = window.interviewData?.[role]?.competencies?.[comp];
       const sets = compData?.questionSets || [];
       const qSet = sets[currentQuestionIndex] || null;
       return { role, comp, compData, sets, qSet };
+    }
+
+    function getDraftKey(role, comp) {
+      return `${role}__${comp}`;
     }
 
     function getSessionKey() {
@@ -309,6 +345,12 @@
       localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(sessions));
     }
 
+    function findCurrentSession() {
+      const sessions = loadSessions();
+      const key = getSessionKey();
+      return sessions.find(s => s.sessionKey === key);
+    }
+
     function loadDraft() {
       try {
         const raw = localStorage.getItem(LS_KEY_DRAFT);
@@ -320,19 +362,20 @@
     }
 
     function saveDraft() {
-      const ctx = getSelectedContext();
+      saveCurrentEvaluationDraft();
+
       const draft = {
         candidateName: safeText(candidateName.value),
         candidateMeta: safeText(candidateMeta.value),
         interviewerName: safeText(interviewerName.value),
         interviewDate: safeText(interviewDate.value),
-        role: ctx.role,
-        comp: ctx.comp,
-        score: safeText(scoreSelect.value),
-        memo: safeText(memoInput.value),
+        role: safeText(roleSelect.value),
+        questionCompetency: safeText(competencySelect.value),
+        evalCompetency: safeText(currentEvalCompetency),
         finalDecision: safeText(finalDecision.value),
         finalComment: safeText(finalComment.value),
-        currentQuestionIndex
+        currentQuestionIndex,
+        draftEvaluations
       };
       localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(draft));
     }
@@ -348,23 +391,64 @@
       });
     }
 
-    function updateCompetencyOptions() {
-      const selectedRole = roleSelect.value;
+    function updateQuestionCompetencyOptions(preferred = "") {
+      const role = roleSelect.value;
+      const list = getRoleCompetencies(role);
+
       competencySelect.innerHTML = "";
-
-      if (!selectedRole || !window.interviewData?.[selectedRole]?.competencies) return;
-
-      const competencies = Object.keys(window.interviewData[selectedRole].competencies);
-      competencies.forEach((comp) => {
+      list.forEach((comp) => {
         const opt = document.createElement("option");
         opt.value = comp;
         opt.textContent = comp;
         competencySelect.appendChild(opt);
       });
+
+      if (preferred && list.includes(preferred)) {
+        competencySelect.value = preferred;
+      } else if (list.length) {
+        competencySelect.value = list[0];
+      }
+    }
+
+    function updateEvalCompetencyOptions(preferred = "") {
+      const role = roleSelect.value;
+      const list = getRoleCompetencies(role);
+
+      evalCompetencySelect.innerHTML = "";
+      list.forEach((comp) => {
+        const opt = document.createElement("option");
+        opt.value = comp;
+        opt.textContent = comp;
+        evalCompetencySelect.appendChild(opt);
+      });
+
+      if (preferred && list.includes(preferred)) {
+        currentEvalCompetency = preferred;
+      } else if (currentEvalCompetency && list.includes(currentEvalCompetency)) {
+        // keep
+      } else {
+        currentEvalCompetency = list[0] || "";
+      }
+
+      if (currentEvalCompetency) {
+        evalCompetencySelect.value = currentEvalCompetency;
+      }
+      updateEvalNavButtons();
+    }
+
+    function updateEvalNavButtons() {
+      const list = getRoleCompetencies(roleSelect.value);
+      const idx = list.indexOf(currentEvalCompetency);
+
+      evalPrevBtn.disabled = idx <= 0;
+      evalNextBtn.disabled = idx < 0 || idx === list.length - 1;
+
+      evalPrevBtn.classList.toggle("opacity-50", evalPrevBtn.disabled);
+      evalNextBtn.classList.toggle("opacity-50", evalNextBtn.disabled);
     }
 
     function validateQuestionIndex() {
-      const { sets } = getSelectedContext();
+      const { sets } = getQuestionContext();
       if (!sets.length) {
         currentQuestionIndex = 0;
         return;
@@ -373,69 +457,81 @@
       if (currentQuestionIndex > sets.length - 1) currentQuestionIndex = sets.length - 1;
     }
 
-    function findCurrentSession() {
-      const sessions = loadSessions();
-      const key = getSessionKey();
-      return sessions.find(s => s.sessionKey === key);
-    }
-
-    function updateCurrentSessionMetaOnly() {
-      const sessions = loadSessions();
-      const key = getSessionKey();
-      const session = sessions.find(s => s.sessionKey === key);
+    function hydrateDraftFromSavedSessionIfNeeded() {
+      const session = findCurrentSession();
       if (!session) return;
 
-      session.candidate = {
-        name: safeText(candidateName.value),
-        meta: safeText(candidateMeta.value)
-      };
-      session.interviewer = safeText(interviewerName.value);
-      session.date = safeText(interviewDate.value);
-      session.role = safeText(roleSelect.value);
-      session.finalDecision = safeText(finalDecision.value);
-      session.finalComment = safeText(finalComment.value);
-      session.updatedAt = new Date().toISOString();
+      if (!safeText(finalDecision.value)) finalDecision.value = session.finalDecision || "";
+      if (!safeText(finalComment.value)) finalComment.value = session.finalComment || "";
 
-      saveSessions(sessions);
+      (session.evaluations || []).forEach((ev) => {
+        const key = getDraftKey(ev.role, ev.competency);
+        if (!draftEvaluations[key]) {
+          draftEvaluations[key] = {
+            role: ev.role,
+            competency: ev.competency,
+            score: ev.score ? String(ev.score) : "",
+            memo: ev.memo || "",
+            updatedAt: ev.updatedAt || session.updatedAt || session.createdAt
+          };
+        }
+      });
     }
 
-    function loadSavedEvaluationToForm() {
-      const { role, comp } = getSelectedContext();
-      const session = findCurrentSession();
+    function saveCurrentEvaluationDraft() {
+      const role = roleSelect.value;
+      const comp = currentEvalCompetency;
+      if (!role || !comp) return;
 
-      if (session) {
-        finalDecision.value = session.finalDecision || "";
-        finalComment.value = session.finalComment || "";
-      }
+      const key = getDraftKey(role, comp);
+      draftEvaluations[key] = {
+        role,
+        competency: comp,
+        score: safeText(scoreSelect.value),
+        memo: safeText(memoInput.value),
+        updatedAt: new Date().toISOString()
+      };
+    }
 
+    function loadEvaluationDraftToForm() {
+      const role = roleSelect.value;
+      const comp = currentEvalCompetency;
       if (!role || !comp) {
         scoreSelect.value = "";
         memoInput.value = "";
         return;
       }
 
-      if (!session) {
-        scoreSelect.value = "";
-        memoInput.value = "";
-        return;
-      }
+      hydrateDraftFromSavedSessionIfNeeded();
 
-      const evaluation = session.evaluations?.find(ev => ev.competencyKey === `${role}__${comp}`);
-      if (!evaluation) {
-        scoreSelect.value = "";
-        memoInput.value = "";
-        currentQuestionIndex = 0;
-        return;
-      }
+      const key = getDraftKey(role, comp);
+      const draft = draftEvaluations[key];
 
-      scoreSelect.value = evaluation.score ? String(evaluation.score) : "";
-      memoInput.value = evaluation.memo || "";
-      currentQuestionIndex = typeof evaluation.questionSetIndex === "number" ? evaluation.questionSetIndex : 0;
+      scoreSelect.value = draft?.score || "";
+      memoInput.value = draft?.memo || "";
+      evalCompetencySelect.value = comp;
+      updateEvalNavButtons();
+    }
+
+    function moveEvalCompetency(direction) {
+      saveCurrentEvaluationDraft();
+
+      const list = getRoleCompetencies(roleSelect.value);
+      const idx = list.indexOf(currentEvalCompetency);
+      if (idx < 0) return;
+
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= list.length) return;
+
+      currentEvalCompetency = list[nextIdx];
+      evalCompetencySelect.value = currentEvalCompetency;
+      loadEvaluationDraftToForm();
+      saveDraft();
     }
 
     function renderContent() {
       validateQuestionIndex();
-      const { role, comp, compData, sets } = getSelectedContext();
+      const { role, comp, compData, sets } = getQuestionContext();
       const qSet = sets[currentQuestionIndex];
 
       if (!role || !comp || !compData || !qSet) {
@@ -507,14 +603,12 @@
 
       prevQuestionBtn.disabled = currentQuestionIndex === 0;
       nextQuestionBtn.disabled = currentQuestionIndex === sets.length - 1;
-      prevQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === 0);
-      nextQuestionBtn.classList.toggle("opacity-50", currentQuestionIndex === sets.length - 1);
-
-      saveDraft();
+      prevQuestionBtn.classList.toggle("opacity-50", prevQuestionBtn.disabled);
+      nextQuestionBtn.classList.toggle("opacity-50", nextQuestionBtn.disabled);
     }
 
     function openBehaviorModal() {
-      const { comp, compData } = getSelectedContext();
+      const { comp, compData } = getQuestionContext();
       if (!comp || !compData?.behaviorIndicators) {
         alert("이 역량의 행동지표 정보가 아직 없습니다.");
         return;
@@ -528,6 +622,7 @@
           ${(bi.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}
         </ul>
       `;
+
       behaviorModal.classList.remove("hidden");
       behaviorModal.classList.add("flex");
     }
@@ -537,36 +632,48 @@
       behaviorModal.classList.remove("flex");
     }
 
-    function validateForSave() {
-      if (!safeText(candidateName.value)) return "후보자명을 입력해주세요.";
-      if (!safeText(interviewerName.value)) return "면접관명을 입력해주세요.";
-      if (!safeText(interviewDate.value)) return "면접일을 선택해주세요.";
-      const { role, comp } = getSelectedContext();
-      if (!role || !comp) return "직무/역량을 선택해주세요.";
-      if (!safeText(scoreSelect.value)) return "평가 점수를 선택해주세요.";
-      return null;
+    function buildEvaluationsForSave() {
+      saveCurrentEvaluationDraft();
+
+      const role = roleSelect.value;
+      const rows = Object.values(draftEvaluations)
+        .filter(ev => ev.role === role)
+        .filter(ev => safeText(ev.score) || safeText(ev.memo))
+        .map(ev => ({
+          role: ev.role,
+          competency: ev.competency,
+          score: ev.score ? Number(ev.score) : null,
+          memo: ev.memo || "",
+          updatedAt: ev.updatedAt || new Date().toISOString()
+        }));
+
+      const roleComps = getRoleCompetencies(role);
+      rows.sort((a, b) => roleComps.indexOf(a.competency) - roleComps.indexOf(b.competency));
+
+      return rows;
     }
 
-    function buildEvaluationRecord() {
-      const { role, comp, compData, sets, qSet } = getSelectedContext();
-      return {
-        competencyKey: `${role}__${comp}`,
-        role,
-        competency: comp,
-        competencyDefinition: compData?.definition || "",
-        questionSetIndex: currentQuestionIndex,
-        questionSetTotal: sets?.length || 0,
-        mainQuestion: qSet?.mainQuestion || "",
-        score: Number(scoreSelect.value),
-        memo: safeText(memoInput.value),
-        updatedAt: new Date().toISOString()
-      };
-    }
+    function saveInterviewSession() {
+      if (!safeText(candidateName.value)) {
+        alert("후보자명을 입력해주세요.");
+        return;
+      }
+      if (!safeText(interviewerName.value)) {
+        alert("면접관명을 입력해주세요.");
+        return;
+      }
+      if (!safeText(interviewDate.value)) {
+        alert("면접일을 선택해주세요.");
+        return;
+      }
+      if (!safeText(roleSelect.value)) {
+        alert("직무를 선택해주세요.");
+        return;
+      }
 
-    function saveCurrentEvaluation() {
-      const err = validateForSave();
-      if (err) {
-        alert(err);
+      const evaluations = buildEvaluationsForSave();
+      if (!evaluations.length) {
+        alert("저장할 역량 평가가 없습니다. 상단 역량 평가 칸반에 점수 또는 메모를 입력해주세요.");
         return;
       }
 
@@ -578,22 +685,12 @@
         session = {
           id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
           sessionKey: key,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          candidate: {
-            name: safeText(candidateName.value),
-            meta: safeText(candidateMeta.value)
-          },
-          interviewer: safeText(interviewerName.value),
-          date: safeText(interviewDate.value),
-          role: safeText(roleSelect.value),
-          finalDecision: safeText(finalDecision.value),
-          finalComment: safeText(finalComment.value),
-          evaluations: []
+          createdAt: new Date().toISOString()
         };
         sessions.push(session);
       }
 
+      session.updatedAt = new Date().toISOString();
       session.candidate = {
         name: safeText(candidateName.value),
         meta: safeText(candidateMeta.value)
@@ -603,20 +700,11 @@
       session.role = safeText(roleSelect.value);
       session.finalDecision = safeText(finalDecision.value);
       session.finalComment = safeText(finalComment.value);
+      session.evaluations = evaluations;
 
-      const evaluation = buildEvaluationRecord();
-      const idx = session.evaluations.findIndex(ev => ev.competencyKey === evaluation.competencyKey);
-
-      if (idx >= 0) {
-        session.evaluations[idx] = evaluation;
-      } else {
-        session.evaluations.push(evaluation);
-      }
-
-      session.updatedAt = new Date().toISOString();
       saveSessions(sessions);
       saveDraft();
-      alert("✅ 현재 역량 평가가 저장되었습니다.");
+      alert("✅ 면접 결과가 저장되었습니다.");
     }
 
     function renderHistory() {
@@ -627,7 +715,7 @@
 
       sessions = sessions.filter(s => {
         const evaluationBlob = (s.evaluations || [])
-          .map(ev => [ev.role, ev.competency, ev.mainQuestion, ev.memo, ev.score].join(" "))
+          .map(ev => [ev.role, ev.competency, ev.memo, ev.score].join(" "))
           .join(" ");
 
         const blob = [
@@ -679,11 +767,7 @@
             ${(s.evaluations || []).map(ev => `
               <div class="rounded-xl bg-white border border-slate-200 p-3">
                 <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
-                <div class="text-xs text-slate-600 mt-1">
-                  점수: ${scoreLabel(ev.score)}
-                </div>
-                <div class="text-xs text-slate-700 mt-2 font-medium">메인 질문</div>
-                <div class="text-sm text-slate-800">${escapeHtml(ev.mainQuestion || "-")}</div>
+                <div class="text-xs text-slate-600 mt-1">점수: ${scoreLabel(ev.score)}</div>
                 <div class="text-xs text-slate-700 mt-2 font-medium">메모</div>
                 <div class="text-sm text-slate-800 whitespace-pre-wrap">${escapeHtml(ev.memo || "(메모 없음)")}</div>
               </div>
@@ -714,7 +798,7 @@
     function exportCurrentSessionToExcel() {
       const session = findCurrentSession();
       if (!session) {
-        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 평가를 저장해주세요.");
+        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
         return;
       }
 
@@ -738,7 +822,6 @@
         직무: ev.role || "",
         역량: ev.competency || "",
         평가점수: scoreLabel(ev.score),
-        메인질문: ev.mainQuestion || "",
         메모: ev.memo || "",
         수정시각: ev.updatedAt ? new Date(ev.updatedAt).toLocaleString() : ""
       }));
@@ -752,7 +835,7 @@
       const ws2 = XLSX.utils.json_to_sheet(evaluationRows);
       ws2["!cols"] = [
         { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
-        { wch: 40 }, { wch: 50 }, { wch: 20 }
+        { wch: 50 }, { wch: 20 }
       ];
       XLSX.utils.book_append_sheet(wb, ws2, "역량평가");
 
@@ -765,7 +848,7 @@
     function exportCurrentSessionToPdf() {
       const session = findCurrentSession();
       if (!session) {
-        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 평가를 저장해주세요.");
+        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
         return;
       }
 
@@ -774,7 +857,6 @@
           <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
           <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
           <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))}</p>
-          <p><strong>메인 질문:</strong> ${escapeHtml(ev.mainQuestion || "-")}</p>
           <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
         </div>
       `).join("");
@@ -829,42 +911,60 @@
     }
 
     function goPrevQuestion() {
-      const { sets } = getSelectedContext();
+      const { sets } = getQuestionContext();
       if (!sets.length) return;
       if (currentQuestionIndex > 0) {
         currentQuestionIndex -= 1;
         renderContent();
+        saveDraft();
       }
     }
 
     function goNextQuestion() {
-      const { sets } = getSelectedContext();
+      const { sets } = getQuestionContext();
       if (!sets.length) return;
       if (currentQuestionIndex < sets.length - 1) {
         currentQuestionIndex += 1;
         renderContent();
+        saveDraft();
       }
     }
 
     roleSelect.addEventListener("change", () => {
-      updateCompetencyOptions();
+      saveCurrentEvaluationDraft();
+
+      const prevQuestionComp = competencySelect.value;
+      updateQuestionCompetencyOptions(prevQuestionComp);
+
+      const prevEvalComp = currentEvalCompetency;
+      updateEvalCompetencyOptions(prevEvalComp);
+      loadEvaluationDraftToForm();
+
       currentQuestionIndex = 0;
-      loadSavedEvaluationToForm();
       renderContent();
       saveDraft();
     });
 
     competencySelect.addEventListener("change", () => {
       currentQuestionIndex = 0;
-      loadSavedEvaluationToForm();
       renderContent();
       saveDraft();
     });
 
+    evalCompetencySelect.addEventListener("change", () => {
+      saveCurrentEvaluationDraft();
+      currentEvalCompetency = evalCompetencySelect.value;
+      loadEvaluationDraftToForm();
+      saveDraft();
+    });
+
+    evalPrevBtn.addEventListener("click", () => moveEvalCompetency(-1));
+    evalNextBtn.addEventListener("click", () => moveEvalCompetency(1));
+
     prevQuestionBtn.addEventListener("click", goPrevQuestion);
     nextQuestionBtn.addEventListener("click", goNextQuestion);
     behaviorBtn.addEventListener("click", openBehaviorModal);
-    saveEvaluationBtn.addEventListener("click", saveCurrentEvaluation);
+    saveSessionBtn.addEventListener("click", saveInterviewSession);
     openHistoryBtn.addEventListener("click", openHistory);
     exportExcelBtn.addEventListener("click", exportCurrentSessionToExcel);
     exportPdfBtn.addEventListener("click", exportCurrentSessionToPdf);
@@ -883,20 +983,19 @@
     historySort.addEventListener("change", renderHistory);
     clearRecordsBtn.addEventListener("click", clearAllRecords);
 
-    [
-      candidateName,
-      candidateMeta,
-      interviewerName,
-      interviewDate,
-      scoreSelect,
-      memoInput,
-      finalDecision,
-      finalComment
-    ].forEach((el) => {
+    [candidateName, candidateMeta, interviewerName, interviewDate, finalDecision, finalComment].forEach((el) => {
       el.addEventListener("input", saveDraft);
-      el.addEventListener("change", () => {
+      el.addEventListener("change", saveDraft);
+    });
+
+    [scoreSelect, memoInput].forEach((el) => {
+      el.addEventListener("input", () => {
+        saveCurrentEvaluationDraft();
         saveDraft();
-        updateCurrentSessionMetaOnly();
+      });
+      el.addEventListener("change", () => {
+        saveCurrentEvaluationDraft();
+        saveDraft();
       });
     });
 
@@ -912,6 +1011,9 @@
     if (draft?.interviewDate) interviewDate.value = draft.interviewDate;
     if (draft?.finalDecision) finalDecision.value = draft.finalDecision;
     if (draft?.finalComment) finalComment.value = draft.finalComment;
+    if (draft?.draftEvaluations && typeof draft.draftEvaluations === "object") {
+      draftEvaluations = draft.draftEvaluations;
+    }
 
     initRoleOptions();
 
@@ -919,19 +1021,16 @@
       roleSelect.value = draft.role;
     }
 
-    updateCompetencyOptions();
+    updateQuestionCompetencyOptions(draft?.questionCompetency || "");
+    updateEvalCompetencyOptions(draft?.evalCompetency || "");
 
-    if (draft?.comp && window.interviewData?.[roleSelect.value]?.competencies?.[draft.comp]) {
-      competencySelect.value = draft.comp;
+    if (typeof draft?.currentQuestionIndex === "number") {
+      currentQuestionIndex = draft.currentQuestionIndex;
     }
 
-    if (draft?.score) scoreSelect.value = draft.score;
-    if (draft?.memo) memoInput.value = draft.memo;
-    if (typeof draft?.currentQuestionIndex === "number") currentQuestionIndex = draft.currentQuestionIndex;
-
-    loadSavedEvaluationToForm();
+    hydrateDraftFromSavedSessionIfNeeded();
+    loadEvaluationDraftToForm();
     renderContent();
   </script>
 </body>
 </html>
-
