@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>역량 기반 면접 가이드</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen">
   <div class="max-w-5xl mx-auto py-8 px-4">
@@ -15,6 +14,14 @@
         직무와 역량을 선택하면 해당 역량을 검증하기 위한 질문, 꼬리질문, 관찰 포인트 등을 자동으로 보여줍니다.
       </p>
     </header>
+
+    <!-- 현재 불러온 기록 표시 -->
+    <section id="loadedSessionBanner" class="mb-4 hidden">
+      <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+        <span class="font-semibold">현재 불러온 기록:</span>
+        <span id="loadedSessionText">-</span>
+      </div>
+    </section>
 
     <!-- 후보자/면접 정보 -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
@@ -53,7 +60,6 @@
 
     <!-- 입력란 묶음: 역량평가 + 최종 총평 -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <!-- 역량평가 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -103,7 +109,6 @@
         </div>
       </div>
 
-      <!-- 최종 총평 -->
       <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -130,7 +135,6 @@
       </div>
     </section>
 
-    <!-- 저장/기록/내보내기 버튼 -->
     <section class="mb-6 flex flex-wrap gap-3">
       <button id="saveSessionBtn"
         class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-900 text-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-800">
@@ -142,18 +146,12 @@
         🗂️ 저장 기록 보기
       </button>
 
-      <button id="exportExcelBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        ⬇️ 면접 결과 내보내기(엑셀)
-      </button>
-
       <button id="exportPdfBtn"
         class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
         🖨️ 면접 결과 저장(PDF)
       </button>
     </section>
 
-    <!-- 직무/역량 선택 (질문 보기용) -->
     <section class="mb-6 grid gap-4 md:grid-cols-2">
       <div>
         <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
@@ -165,7 +163,6 @@
       </div>
     </section>
 
-    <!-- 질문 이동/행동지표 -->
     <section class="mb-6 flex flex-wrap gap-3">
       <button id="prevQuestionBtn"
         class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
@@ -186,7 +183,6 @@
     <section id="contentArea" class="space-y-4"></section>
   </div>
 
-  <!-- 행동지표 모달 -->
   <div id="behaviorModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
     <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl border border-slate-200">
       <div class="flex items-center justify-between mb-3">
@@ -197,7 +193,6 @@
     </div>
   </div>
 
-  <!-- 기록 모달 -->
   <div id="historyModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
     <div class="bg-white rounded-2xl max-w-4xl w-full p-5 shadow-xl border border-slate-200">
       <div class="flex items-center justify-between mb-3">
@@ -243,7 +238,6 @@
     const behaviorBtn = document.getElementById("behaviorBtn");
     const saveSessionBtn = document.getElementById("saveSessionBtn");
     const openHistoryBtn = document.getElementById("openHistoryBtn");
-    const exportExcelBtn = document.getElementById("exportExcelBtn");
     const exportPdfBtn = document.getElementById("exportPdfBtn");
 
     const candidateName = document.getElementById("candidateName");
@@ -266,12 +260,16 @@
     const historySort = document.getElementById("historySort");
     const clearRecordsBtn = document.getElementById("clearRecordsBtn");
 
+    const loadedSessionBanner = document.getElementById("loadedSessionBanner");
+    const loadedSessionText = document.getElementById("loadedSessionText");
+
     let currentQuestionIndex = 0;
     let currentEvalCompetency = "";
     let draftEvaluations = {};
+    let loadedSessionId = null;
 
-    const LS_KEY_SESSIONS = "dozn_interview_sessions_v5";
-    const LS_KEY_DRAFT = "dozn_interview_draft_v5";
+    const LS_KEY_SESSIONS = "dozn_interview_sessions_v6";
+    const LS_KEY_DRAFT = "dozn_interview_draft_v6";
 
     function todayISO() {
       const d = new Date();
@@ -330,6 +328,26 @@
       ].join("||");
     }
 
+    function updateLoadedSessionBanner() {
+      if (!loadedSessionId) {
+        loadedSessionBanner.classList.add("hidden");
+        loadedSessionText.textContent = "-";
+        return;
+      }
+
+      const session = loadSessions().find(s => s.id === loadedSessionId);
+      if (!session) {
+        loadedSessionId = null;
+        loadedSessionBanner.classList.add("hidden");
+        loadedSessionText.textContent = "-";
+        saveDraft();
+        return;
+      }
+
+      loadedSessionText.textContent = `${session.candidate?.name || "-"} · ${session.role || "-"} · ${session.date || "-"}`;
+      loadedSessionBanner.classList.remove("hidden");
+    }
+
     function loadSessions() {
       try {
         const raw = localStorage.getItem(LS_KEY_SESSIONS);
@@ -347,6 +365,12 @@
 
     function findCurrentSession() {
       const sessions = loadSessions();
+
+      if (loadedSessionId) {
+        const loaded = sessions.find(s => s.id === loadedSessionId);
+        if (loaded) return loaded;
+      }
+
       const key = getSessionKey();
       return sessions.find(s => s.sessionKey === key);
     }
@@ -375,7 +399,8 @@
         finalDecision: safeText(finalDecision.value),
         finalComment: safeText(finalComment.value),
         currentQuestionIndex,
-        draftEvaluations
+        draftEvaluations,
+        loadedSessionId
       };
       localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(draft));
     }
@@ -425,7 +450,6 @@
       if (preferred && list.includes(preferred)) {
         currentEvalCompetency = preferred;
       } else if (currentEvalCompetency && list.includes(currentEvalCompetency)) {
-        // keep
       } else {
         currentEvalCompetency = list[0] || "";
       }
@@ -680,7 +704,16 @@
       const sessions = loadSessions();
       const key = getSessionKey();
 
-      let session = sessions.find(s => s.sessionKey === key);
+      let session = null;
+
+      if (loadedSessionId) {
+        session = sessions.find(s => s.id === loadedSessionId);
+      }
+
+      if (!session) {
+        session = sessions.find(s => s.sessionKey === key);
+      }
+
       if (!session) {
         session = {
           id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
@@ -690,6 +723,7 @@
         sessions.push(session);
       }
 
+      session.sessionKey = key;
       session.updatedAt = new Date().toISOString();
       session.candidate = {
         name: safeText(candidateName.value),
@@ -702,9 +736,177 @@
       session.finalComment = safeText(finalComment.value);
       session.evaluations = evaluations;
 
+      loadedSessionId = session.id;
+
       saveSessions(sessions);
       saveDraft();
+      updateLoadedSessionBanner();
       alert("✅ 면접 결과가 저장되었습니다.");
+    }
+
+    function buildSessionPdfHtml(session) {
+      const evaluationCards = (session.evaluations || []).map((ev, idx) => `
+        <div class="card">
+          <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
+          <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
+          <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))}</p>
+          <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
+        </div>
+      `).join("");
+
+      return `
+        <html>
+          <head>
+            <title>면접 평가 결과</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+              h1 { font-size: 24px; margin-bottom: 8px; }
+              h2 { font-size: 16px; margin-bottom: 20px; color: #475569; }
+              .meta { margin-bottom: 24px; line-height: 1.7; }
+              .section-title { font-size: 18px; margin: 24px 0 12px; }
+              .summary-box, .card {
+                border: 1px solid #cbd5e1;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+                page-break-inside: avoid;
+              }
+              .card h3 { margin: 0 0 10px 0; font-size: 18px; }
+              p { margin: 6px 0; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <h1>역량 기반 면접 평가 결과</h1>
+            <h2>${escapeHtml(session.candidate?.name || "-")}</h2>
+
+            <div class="meta">
+              <div><strong>지원 포지션/메모:</strong> ${escapeHtml(session.candidate?.meta || "-")}</div>
+              <div><strong>면접관:</strong> ${escapeHtml(session.interviewer || "-")}</div>
+              <div><strong>면접일:</strong> ${escapeHtml(session.date || "-")}</div>
+              <div><strong>직무:</strong> ${escapeHtml(session.role || "-")}</div>
+            </div>
+
+            <div class="section-title">최종 총평</div>
+            <div class="summary-box">
+              <p><strong>최종 판정:</strong> ${escapeHtml(session.finalDecision || "-")}</p>
+              <p><strong>총평:</strong><br>${escapeHtml(session.finalComment || "(총평 없음)").replace(/\n/g, "<br>")}</p>
+            </div>
+
+            <div class="section-title">역량별 평가</div>
+            ${evaluationCards}
+          </body>
+        </html>
+      `;
+    }
+
+    function printSessionToPdf(session) {
+      if (!session) {
+        alert("출력할 저장 기록을 찾을 수 없습니다.");
+        return;
+      }
+
+      const printWindow = window.open("", "_blank", "width=900,height=1000");
+      printWindow.document.write(buildSessionPdfHtml(session));
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+
+    function exportCurrentSessionToPdf() {
+      const session = findCurrentSession();
+      if (!session) {
+        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
+        return;
+      }
+      printSessionToPdf(session);
+    }
+
+    function loadSessionIntoForm(sessionId) {
+      const sessions = loadSessions();
+      const session = sessions.find(s => s.id === sessionId);
+
+      if (!session) {
+        alert("불러올 저장 기록을 찾을 수 없습니다.");
+        return;
+      }
+
+      saveCurrentEvaluationDraft();
+
+      candidateName.value = session.candidate?.name || "";
+      candidateMeta.value = session.candidate?.meta || "";
+      interviewerName.value = session.interviewer || "";
+      interviewDate.value = session.date || todayISO();
+      finalDecision.value = session.finalDecision || "";
+      finalComment.value = session.finalComment || "";
+
+      if (session.role && window.interviewData?.[session.role]) {
+        roleSelect.value = session.role;
+      }
+
+      updateQuestionCompetencyOptions();
+      updateEvalCompetencyOptions();
+
+      Object.keys(draftEvaluations).forEach(key => {
+        const item = draftEvaluations[key];
+        if (item?.role === session.role) {
+          delete draftEvaluations[key];
+        }
+      });
+
+      (session.evaluations || []).forEach(ev => {
+        const key = getDraftKey(ev.role, ev.competency);
+        draftEvaluations[key] = {
+          role: ev.role,
+          competency: ev.competency,
+          score: ev.score ? String(ev.score) : "",
+          memo: ev.memo || "",
+          updatedAt: ev.updatedAt || session.updatedAt || session.createdAt
+        };
+      });
+
+      const roleCompetencies = getRoleCompetencies(session.role || "");
+      const firstComp = session.evaluations?.[0]?.competency || roleCompetencies[0] || "";
+
+      if (firstComp) {
+        updateQuestionCompetencyOptions(firstComp);
+        currentEvalCompetency = firstComp;
+        updateEvalCompetencyOptions(firstComp);
+      }
+
+      currentQuestionIndex = 0;
+      loadedSessionId = session.id;
+      loadEvaluationDraftToForm();
+      renderContent();
+      updateLoadedSessionBanner();
+      saveDraft();
+      closeHistory();
+
+      alert(`✅ ${session.candidate?.name || "후보자"}님의 저장 기록을 불러왔습니다.`);
+    }
+
+    function deleteSession(sessionId) {
+      const sessions = loadSessions();
+      const session = sessions.find(s => s.id === sessionId);
+
+      if (!session) {
+        alert("삭제할 저장 기록을 찾을 수 없습니다.");
+        return;
+      }
+
+      const ok = confirm(`"${session.candidate?.name || "후보자"}" 기록을 삭제할까요?`);
+      if (!ok) return;
+
+      const nextSessions = sessions.filter(s => s.id !== sessionId);
+      saveSessions(nextSessions);
+
+      if (loadedSessionId === sessionId) {
+        loadedSessionId = null;
+        updateLoadedSessionBanner();
+        saveDraft();
+      }
+
+      renderHistory();
+      alert("🗑️ 기록이 삭제되었습니다.");
     }
 
     function renderHistory() {
@@ -758,6 +960,29 @@
           </summary>
 
           <div class="mt-3 grid gap-3">
+            <div class="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                class="load-session-btn text-xs px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50"
+                data-session-id="${escapeHtml(s.id)}">
+                📥 불러오기
+              </button>
+
+              <button
+                type="button"
+                class="pdf-session-btn text-xs px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50"
+                data-session-id="${escapeHtml(s.id)}">
+                🖨️ PDF
+              </button>
+
+              <button
+                type="button"
+                class="delete-session-btn text-xs px-3 py-2 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
+                data-session-id="${escapeHtml(s.id)}">
+                🗑️ 삭제
+              </button>
+            </div>
+
             <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
               <div class="text-xs font-semibold text-slate-700 mb-1">🧾 최종 총평</div>
               <div class="text-sm text-slate-800"><strong>최종 판정:</strong> ${escapeHtml(s.finalDecision || "-")}</div>
@@ -775,6 +1000,32 @@
           </div>
         </details>
       `).join("");
+
+      historyList.querySelectorAll(".load-session-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          loadSessionIntoForm(btn.dataset.sessionId);
+        });
+      });
+
+      historyList.querySelectorAll(".pdf-session-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const sessions = loadSessions();
+          const session = sessions.find(s => s.id === btn.dataset.sessionId);
+          printSessionToPdf(session);
+        });
+      });
+
+      historyList.querySelectorAll(".delete-session-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          deleteSession(btn.dataset.sessionId);
+        });
+      });
     }
 
     function openHistory() {
@@ -792,122 +1043,10 @@
       const ok = confirm("저장된 모든 면접 세션 기록을 삭제할까요?");
       if (!ok) return;
       localStorage.removeItem(LS_KEY_SESSIONS);
+      loadedSessionId = null;
+      updateLoadedSessionBanner();
+      saveDraft();
       renderHistory();
-    }
-
-    function exportCurrentSessionToExcel() {
-      const session = findCurrentSession();
-      if (!session) {
-        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
-        return;
-      }
-
-      if (typeof XLSX === "undefined") {
-        alert("엑셀 라이브러리가 로드되지 않았습니다.");
-        return;
-      }
-
-      const summaryRows = [
-        { 항목: "후보자명", 값: session.candidate?.name || "" },
-        { 항목: "지원 포지션/메모", 값: session.candidate?.meta || "" },
-        { 항목: "면접관", 값: session.interviewer || "" },
-        { 항목: "면접일", 값: session.date || "" },
-        { 항목: "직무", 값: session.role || "" },
-        { 항목: "최종 판정", 값: session.finalDecision || "" },
-        { 항목: "최종 총평", 값: session.finalComment || "" }
-      ];
-
-      const evaluationRows = (session.evaluations || []).map((ev, idx) => ({
-        순번: idx + 1,
-        직무: ev.role || "",
-        역량: ev.competency || "",
-        평가점수: scoreLabel(ev.score),
-        메모: ev.memo || "",
-        수정시각: ev.updatedAt ? new Date(ev.updatedAt).toLocaleString() : ""
-      }));
-
-      const wb = XLSX.utils.book_new();
-
-      const ws1 = XLSX.utils.json_to_sheet(summaryRows);
-      ws1["!cols"] = [{ wch: 18 }, { wch: 80 }];
-      XLSX.utils.book_append_sheet(wb, ws1, "면접요약");
-
-      const ws2 = XLSX.utils.json_to_sheet(evaluationRows);
-      ws2["!cols"] = [
-        { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
-        { wch: 50 }, { wch: 20 }
-      ];
-      XLSX.utils.book_append_sheet(wb, ws2, "역량평가");
-
-      XLSX.writeFile(
-        wb,
-        `interview_session_${safeText(session.candidate?.name || "candidate")}_${session.date || todayISO()}.xlsx`
-      );
-    }
-
-    function exportCurrentSessionToPdf() {
-      const session = findCurrentSession();
-      if (!session) {
-        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
-        return;
-      }
-
-      const evaluationCards = (session.evaluations || []).map((ev, idx) => `
-        <div class="card">
-          <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
-          <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
-          <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))}</p>
-          <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
-        </div>
-      `).join("");
-
-      const printWindow = window.open("", "_blank", "width=900,height=1000");
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>면접 평가 결과</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
-              h1 { font-size: 24px; margin-bottom: 8px; }
-              h2 { font-size: 16px; margin-bottom: 20px; color: #475569; }
-              .meta { margin-bottom: 24px; line-height: 1.7; }
-              .section-title { font-size: 18px; margin: 24px 0 12px; }
-              .summary-box, .card {
-                border: 1px solid #cbd5e1;
-                border-radius: 12px;
-                padding: 16px;
-                margin-bottom: 16px;
-                page-break-inside: avoid;
-              }
-              .card h3 { margin: 0 0 10px 0; font-size: 18px; }
-              p { margin: 6px 0; line-height: 1.6; }
-            </style>
-          </head>
-          <body>
-            <h1>역량 기반 면접 평가 결과</h1>
-            <h2>${escapeHtml(session.candidate?.name || "-")}</h2>
-
-            <div class="meta">
-              <div><strong>지원 포지션/메모:</strong> ${escapeHtml(session.candidate?.meta || "-")}</div>
-              <div><strong>면접관:</strong> ${escapeHtml(session.interviewer || "-")}</div>
-              <div><strong>면접일:</strong> ${escapeHtml(session.date || "-")}</div>
-              <div><strong>직무:</strong> ${escapeHtml(session.role || "-")}</div>
-            </div>
-
-            <div class="section-title">최종 총평</div>
-            <div class="summary-box">
-              <p><strong>최종 판정:</strong> ${escapeHtml(session.finalDecision || "-")}</p>
-              <p><strong>총평:</strong><br>${escapeHtml(session.finalComment || "(총평 없음)").replace(/\n/g, "<br>")}</p>
-            </div>
-
-            <div class="section-title">역량별 평가</div>
-            ${evaluationCards}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
     }
 
     function goPrevQuestion() {
@@ -966,7 +1105,6 @@
     behaviorBtn.addEventListener("click", openBehaviorModal);
     saveSessionBtn.addEventListener("click", saveInterviewSession);
     openHistoryBtn.addEventListener("click", openHistory);
-    exportExcelBtn.addEventListener("click", exportCurrentSessionToExcel);
     exportPdfBtn.addEventListener("click", exportCurrentSessionToPdf);
 
     closeBehaviorModal.addEventListener("click", closeBehavior);
@@ -1014,6 +1152,9 @@
     if (draft?.draftEvaluations && typeof draft.draftEvaluations === "object") {
       draftEvaluations = draft.draftEvaluations;
     }
+    if (draft?.loadedSessionId) {
+      loadedSessionId = draft.loadedSessionId;
+    }
 
     initRoleOptions();
 
@@ -1031,6 +1172,7 @@
     hydrateDraftFromSavedSessionIfNeeded();
     loadEvaluationDraftToForm();
     renderContent();
+    updateLoadedSessionBanner();
   </script>
 </body>
 </html>
