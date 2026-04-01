@@ -6,6 +6,7 @@
     <title>더즌 구조화 면접 가이드</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
       @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -74,6 +75,15 @@
         z-index: 1;
         min-height: 100vh;
       }
+
+      .pdf-root {
+        background: white;
+      }
+
+      .pdf-break-avoid {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
     </style>
   </head>
   <body>
@@ -93,8 +103,11 @@
         window.INTERVIEW_DATA.positions[0]?.competencies?.[0]?.id || "final-review";
       let showPdfPreview = false;
 
+      // 질문별 점수
       let selectedScores = {};
-      let selectedFinalDecisionByPosition = {};
+
+      // 포지션별 입력값 저장
+      let formStateByPosition = {};
 
       function getSelectedPosition() {
         return (
@@ -123,6 +136,53 @@
         ];
       }
 
+      function getDefaultFormState() {
+        return {
+          candidateName: "",
+          interviewer: "",
+          interviewDate: "",
+          overallComment: "",
+          followUpCheck: "",
+          finalDecision:
+            window.INTERVIEW_DATA.finalOptions?.[0] || "추천",
+          questionMemos: {},
+        };
+      }
+
+      function getFormState() {
+        if (!formStateByPosition[selectedPositionId]) {
+          formStateByPosition[selectedPositionId] = getDefaultFormState();
+        }
+        return formStateByPosition[selectedPositionId];
+      }
+
+      function getQuestionMemo(sectionId, questionIndex) {
+        const form = getFormState();
+        const key = `${sectionId}__${questionIndex}`;
+        return form.questionMemos[key] || "";
+      }
+
+      function setQuestionMemo(sectionId, questionIndex, value) {
+        const form = getFormState();
+        const key = `${sectionId}__${questionIndex}`;
+        form.questionMemos[key] = value;
+      }
+
+      function updateFormField(field, value) {
+        const form = getFormState();
+        form[field] = value;
+      }
+
+      function setFinalDecision(decision) {
+        const form = getFormState();
+        form.finalDecision = decision;
+        render();
+      }
+
+      function getFinalDecision() {
+        return getFormState().finalDecision;
+      }
+
       function getQuestionScore(sectionId, questionIndex) {
         const key = `${selectedPositionId}__${sectionId}__${questionIndex}`;
         return selectedScores[key] || null;
@@ -131,19 +191,6 @@
       function setQuestionScore(sectionId, questionIndex, score) {
         const key = `${selectedPositionId}__${sectionId}__${questionIndex}`;
         selectedScores[key] = score;
-        render();
-      }
-
-      function getFinalDecision() {
-        return (
-          selectedFinalDecisionByPosition[selectedPositionId] ||
-          window.INTERVIEW_DATA.finalOptions?.[0] ||
-          "추천"
-        );
-      }
-
-      function setFinalDecision(decision) {
-        selectedFinalDecisionByPosition[selectedPositionId] = decision;
         render();
       }
 
@@ -191,6 +238,19 @@
             el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }, 10);
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function nl2br(value) {
+        return escapeHtml(value).replace(/\n/g, "<br>");
       }
 
       function renderLanding() {
@@ -252,6 +312,7 @@
         const selected = getSelectedPosition();
         const competencies = getCompetencies();
         const navItems = getNavItems();
+        const form = getFormState();
         const currentFinalDecision = getFinalDecision();
 
         return `
@@ -451,7 +512,8 @@
                                 <textarea
                                   class="mt-3 h-40 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
                                   placeholder="${data.labels.memoPlaceholder}"
-                                ></textarea>
+                                  oninput="setQuestionMemo('${section.id}', ${qIndex}, this.value)"
+                                >${escapeHtml(getQuestionMemo(section.id, qIndex))}</textarea>
                               </div>
                             </div>
                           </div>
@@ -480,14 +542,37 @@
                   </div>
 
                   <div class="grid gap-4 md:grid-cols-3">
-                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.candidateName}" />
-                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.interviewer}" />
-                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.interviewDate}" />
+                    <input
+                      class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      placeholder="${data.labels.candidateName}"
+                      value="${escapeHtml(form.candidateName)}"
+                      oninput="updateFormField('candidateName', this.value)"
+                    />
+                    <input
+                      class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      placeholder="${data.labels.interviewer}"
+                      value="${escapeHtml(form.interviewer)}"
+                      oninput="updateFormField('interviewer', this.value)"
+                    />
+                    <input
+                      class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      placeholder="${data.labels.interviewDate}"
+                      value="${escapeHtml(form.interviewDate)}"
+                      oninput="updateFormField('interviewDate', this.value)"
+                    />
                   </div>
 
                   <div class="mt-5 grid gap-4 lg:grid-cols-2">
-                    <textarea class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.overallComment}"></textarea>
-                    <textarea class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.followUpCheck}"></textarea>
+                    <textarea
+                      class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      placeholder="${data.labels.overallComment}"
+                      oninput="updateFormField('overallComment', this.value)"
+                    >${escapeHtml(form.overallComment)}</textarea>
+                    <textarea
+                      class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                      placeholder="${data.labels.followUpCheck}"
+                      oninput="updateFormField('followUpCheck', this.value)"
+                    >${escapeHtml(form.followUpCheck)}</textarea>
                   </div>
 
                   <div class="mt-5">
@@ -524,6 +609,7 @@
         const data = window.INTERVIEW_DATA;
         const selected = getSelectedPosition();
         const competencies = getCompetencies();
+        const form = getFormState();
         const currentFinalDecision = getFinalDecision();
 
         return `
@@ -534,30 +620,38 @@
                   <p class="text-sm font-medium text-blue-600">${data.labels.pdfPreview}</p>
                   <h3 class="mt-1 text-2xl font-semibold text-slate-900">${data.labels.pdfSample}</h3>
                 </div>
-                <button
-                  onclick="closePdfPreview()"
-                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
-                >
-                  ${data.labels.close}
-                </button>
+                <div class="flex gap-2">
+                  <button
+                    onclick="downloadPdf()"
+                    class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-4 py-2 text-sm font-medium text-white"
+                  >
+                    PDF 다운로드
+                  </button>
+                  <button
+                    onclick="closePdfPreview()"
+                    class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                  >
+                    ${data.labels.close}
+                  </button>
+                </div>
               </div>
 
-              <div class="mx-auto max-w-3xl rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
+              <div id="pdf-content" class="pdf-root mx-auto max-w-3xl rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
                 <div class="border-b border-slate-200 pb-6">
                   <p class="text-sm font-medium tracking-[0.16em] text-slate-500">DOZN INTERVIEW GUIDE</p>
                   <h4 class="mt-3 text-3xl font-semibold text-slate-900">${selected.name} 면접 결과</h4>
                   <div class="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
                     <div>
                       <p class="font-semibold text-slate-900">${data.labels.candidateName}</p>
-                      <p>${selected.pdfPreview.candidateName}</p>
+                      <p>${escapeHtml(form.candidateName || selected.pdfPreview?.candidateName || "-")}</p>
                     </div>
                     <div>
                       <p class="font-semibold text-slate-900">${data.labels.interviewer}</p>
-                      <p>${selected.pdfPreview.interviewers}</p>
+                      <p>${escapeHtml(form.interviewer || selected.pdfPreview?.interviewers || "-")}</p>
                     </div>
                     <div>
                       <p class="font-semibold text-slate-900">${data.labels.interviewDate}</p>
-                      <p>${selected.pdfPreview.interviewDate}</p>
+                      <p>${escapeHtml(form.interviewDate || selected.pdfPreview?.interviewDate || "-")}</p>
                     </div>
                   </div>
                 </div>
@@ -565,29 +659,37 @@
                 <div class="mt-6 space-y-5">
                   ${competencies
                     .map(
-                      (item, qIdx) => `
-                    <div class="rounded-3xl border border-slate-200 p-5">
+                      (item) => `
+                    <div class="pdf-break-avoid rounded-3xl border border-slate-200 p-5">
                       <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <p class="text-sm font-medium text-blue-600">${item.order}</p>
                           <p class="text-xl font-semibold text-slate-900">${item.name}</p>
                         </div>
                         <div class="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                          ${getQuestionScore(item.id, 0) || 4} / 5점
+                          ${getQuestionScore(item.id, 0) || "-"} / 5점
                         </div>
                       </div>
-                      <div class="grid gap-4 md:grid-cols-[1fr_1.2fr]">
-                        <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                          <p class="font-semibold text-slate-900">${data.labels.mainQuestion}</p>
-                          <p class="mt-2">${item.questions[0]?.main || "-"}</p>
-                        </div>
-                        <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                          <p class="font-semibold text-slate-900">${data.labels.memoSummary}</p>
-                          <p class="mt-2">
-                            실제 사례를 바탕으로 상황, 판단 기준, 결과를 비교적 구체적으로 설명했으며 본인의 역할과 의사결정 흐름이 드러났습니다. 다만 일부 답변은 수치나 결과 근거가 조금 더 보완되면 좋겠습니다.
-                          </p>
-                        </div>
-                      </div>
+
+                      ${item.questions
+                        .map((q, qIndex) => {
+                          const memo = getQuestionMemo(item.id, qIndex);
+                          const score = getQuestionScore(item.id, qIndex);
+                          return `
+                            <div class="mt-4 rounded-2xl bg-slate-50 p-4">
+                              <p class="text-sm font-semibold text-slate-900">${data.labels.mainQuestion}</p>
+                              <p class="mt-2 text-sm leading-6 text-slate-700">${escapeHtml(q.main)}</p>
+                              <div class="mt-3 text-sm text-slate-600">
+                                <span class="font-semibold text-slate-900">점수</span> : ${score || "-"} / 5
+                              </div>
+                              <div class="mt-3">
+                                <p class="text-sm font-semibold text-slate-900">${data.labels.memoSummary}</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-700">${memo ? nl2br(memo) : "작성된 메모 없음"}</p>
+                              </div>
+                            </div>
+                          `;
+                        })
+                        .join("")}
                     </div>
                   `
                     )
@@ -598,23 +700,27 @@
                   <div class="rounded-3xl border border-slate-200 p-5">
                     <p class="text-lg font-semibold text-slate-900">${data.labels.overallCommentTitle}</p>
                     <p class="mt-3 text-sm leading-7 text-slate-700">
-                      ${selected.pdfPreview.overallComment}
+                      ${form.overallComment ? nl2br(form.overallComment) : escapeHtml(selected.pdfPreview?.overallComment || "작성된 종합 의견 없음")}
                     </p>
                   </div>
                   <div class="rounded-3xl border border-slate-200 p-5">
                     <p class="text-lg font-semibold text-slate-900">${data.labels.followUpTitle}</p>
-                    <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-700">
-                      ${selected.pdfPreview.followUps
-                        .map((item) => `<li>• ${item}</li>`)
-                        .join("")}
-                    </ul>
+                    <div class="mt-3 text-sm leading-7 text-slate-700">
+                      ${
+                        form.followUpCheck
+                          ? nl2br(form.followUpCheck)
+                          : (selected.pdfPreview?.followUps?.length
+                              ? selected.pdfPreview.followUps.map((item) => `• ${escapeHtml(item)}`).join("<br>")
+                              : "작성된 추가 확인사항 없음")
+                      }
+                    </div>
                   </div>
                 </div>
 
                 <div class="mt-6 rounded-3xl bg-slate-900 px-6 py-5 text-white">
                   <p class="text-sm font-medium text-slate-300">${data.labels.finalReview}</p>
                   <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-2xl font-semibold">${currentFinalDecision}</p>
+                    <p class="text-2xl font-semibold">${escapeHtml(currentFinalDecision)}</p>
                     <p class="text-sm leading-6 text-slate-300">${data.pdfFooterNote}</p>
                   </div>
                 </div>
@@ -622,6 +728,36 @@
             </div>
           </div>
         `;
+      }
+
+      function downloadPdf() {
+        const selected = getSelectedPosition();
+        const form = getFormState();
+        const element = document.getElementById("pdf-content");
+        if (!element) return;
+
+        const fileName = `${selected.name}_${form.candidateName || "면접결과"}.pdf`;
+
+        const opt = {
+          margin: [10, 10, 10, 10],
+          filename: fileName,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            scrollY: 0,
+          },
+          jsPDF: {
+            unit: "mm",
+            format: "a4",
+            orientation: "portrait",
+          },
+          pagebreak: {
+            mode: ["css", "legacy"],
+          },
+        };
+
+        html2pdf().set(opt).from(element).save();
       }
 
       function render() {
@@ -638,7 +774,10 @@
       window.openPdfPreview = openPdfPreview;
       window.closePdfPreview = closePdfPreview;
       window.setQuestionScore = setQuestionScore;
+      window.setQuestionMemo = setQuestionMemo;
+      window.updateFormField = updateFormField;
       window.setFinalDecision = setFinalDecision;
+      window.downloadPdf = downloadPdf;
 
       render();
     </script>
