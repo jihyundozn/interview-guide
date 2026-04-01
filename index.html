@@ -1,1178 +1,608 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>역량 기반 면접 가이드</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-100 min-h-screen">
-  <div class="max-w-5xl mx-auto py-8 px-4">
-    <header class="mb-6">
-      <h1 class="text-2xl font-bold text-slate-900 mb-2">역량 기반 면접 가이드</h1>
-      <p class="text-sm text-slate-600">
-        직무와 역량을 선택하면 해당 역량을 검증하기 위한 질문, 꼬리질문, 관찰 포인트 등을 자동으로 보여줍니다.
-      </p>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>더즌 구조화 면접 가이드</title>
 
-    <!-- 현재 불러온 기록 표시 -->
-    <section id="loadedSessionBanner" class="mb-4 hidden">
-      <div class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
-        <span class="font-semibold">현재 불러온 기록:</span>
-        <span id="loadedSessionText">-</span>
-      </div>
-    </section>
+    <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- 후보자/면접 정보 -->
-    <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-        <h2 class="text-sm font-semibold text-slate-900 mb-3">🧑‍💼 후보자 정보</h2>
-        <div class="grid gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">후보자명</label>
-            <input id="candidateName" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                   placeholder="예: 홍길동" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">지원 포지션/메모(선택)</label>
-            <input id="candidateMeta" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                   placeholder="예: 포지션 및 참고사항 등" />
-          </div>
-        </div>
-      </div>
+    <style>
+      @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
-      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-        <h2 class="text-sm font-semibold text-slate-900 mb-3">🧑‍⚖️ 면접관 정보</h2>
-        <div class="grid gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">면접관명</label>
-            <input id="interviewerName" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                   placeholder="예: 김더즌" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">면접일</label>
-            <input id="interviewDate" type="date"
-                   class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 입력란 묶음: 역량평가 + 최종 평가 -->
-    <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-900">⭐ 역량 평가</h2>
-            <p class="text-xs text-slate-500">상단 칸반 안에서 역량을 바꿔가며 평가를 이어서 작성할 수 있습니다.</p>
-          </div>
-        </div>
-
-        <div class="mt-3 grid gap-3">
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">평가 역량 선택</label>
-            <div class="flex items-center gap-2">
-              <button id="evalPrevBtn"
-                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-sm shadow-sm hover:bg-slate-50"
-                type="button">
-                ◀
-              </button>
-
-              <select id="evalCompetencySelect" class="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
-
-              <button id="evalNextBtn"
-                class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white text-sm shadow-sm hover:bg-slate-50"
-                type="button">
-                ▶
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">평가 점수</label>
-            <select id="scoreSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
-              <option value="">선택</option>
-              <option value="1">부족함</option>
-              <option value="2">개선필요</option>
-              <option value="3">기대충족</option>
-              <option value="4">기대초과</option>
-              <option value="5">탁월</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-slate-700 mb-1">면접관 메모</label>
-            <textarea id="memoInput" rows="7"
-              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-              placeholder="관찰한 근거/사례/우려 포인트를 적어두면 평가 합의가 쉬워져요."></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-900">🧾 최종 평가</h2>
-            <p class="text-xs text-slate-500">후보자 전체에 대한 최종 의견과 결과를 남깁니다.</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-600">최종 결과</span>
-            <select id="finalDecision" class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm">
-              <option value="">선택</option>
-              <option value="추천">추천</option>
-              <option value="보류">보류</option>
-              <option value="비추천">비추천</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="mt-3">
-          <label class="block text-xs font-medium text-slate-700 mb-1">최종 결과 메모</label>
-          <textarea id="finalComment" rows="10"
-            class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            placeholder="후보자 전체 강점/우려점/추가 확인 필요사항 등을 적어주세요."></textarea>
-        </div>
-      </div>
-    </section>
-
-    <section class="mb-6 flex flex-wrap gap-3">
-      <button id="saveSessionBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-slate-900 text-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-800">
-        💾 면접 결과 저장
-      </button>
-
-      <button id="openHistoryBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        🗂️ 저장 기록 보기
-      </button>
-
-      <button id="exportPdfBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        🖨️ 면접 결과 저장(PDF)
-      </button>
-    </section>
-
-    <section class="mb-6 grid gap-4 md:grid-cols-2">
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">직무 선택</label>
-        <select id="roleSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">역량 선택 (질문 보기용)</label>
-        <select id="competencySelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"></select>
-      </div>
-    </section>
-
-    <section class="mb-6 flex flex-wrap gap-3">
-      <button id="prevQuestionBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        ⬅️ 이전 질문
-      </button>
-
-      <button id="nextQuestionBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        ➡️ 다음 질문
-      </button>
-
-      <button id="behaviorBtn"
-        class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium shadow-sm hover:bg-slate-50">
-        📋 이 역량의 행동지표 보기
-      </button>
-    </section>
-
-    <section id="contentArea" class="space-y-4"></section>
-  </div>
-
-  <div id="behaviorModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl border border-slate-200">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold text-slate-900">이 역량의 행동지표</h2>
-        <button id="closeBehaviorModal" class="text-slate-500 hover:text-slate-800 text-sm">✕</button>
-      </div>
-      <div id="behaviorModalContent" class="text-sm text-slate-800 space-y-2"></div>
-    </div>
-  </div>
-
-  <div id="historyModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-2xl max-w-4xl w-full p-5 shadow-xl border border-slate-200">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold text-slate-900">저장된 평가 기록</h2>
-        <div class="flex items-center gap-2">
-          <button id="clearRecordsBtn" class="text-xs px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50">
-            🧹 전체 삭제
-          </button>
-          <button id="closeHistoryModal" class="text-slate-500 hover:text-slate-800 text-sm">✕</button>
-        </div>
-      </div>
-
-      <div class="grid gap-3 md:grid-cols-3 mb-3">
-        <div class="md:col-span-2">
-          <input id="historySearch" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                 placeholder="검색: 후보자명/면접관/직무/역량 등" />
-        </div>
-        <div>
-          <select id="historySort" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
-            <option value="newest">최신순</option>
-            <option value="oldest">오래된순</option>
-          </select>
-        </div>
-      </div>
-
-      <div id="historyList" class="max-h-[60vh] overflow-auto border border-slate-200 rounded-xl"></div>
-    </div>
-  </div>
-
-  <script src="interview-data.js"></script>
-
-  <script>
-    const roleSelect = document.getElementById("roleSelect");
-    const competencySelect = document.getElementById("competencySelect");
-    const contentArea = document.getElementById("contentArea");
-
-    const evalCompetencySelect = document.getElementById("evalCompetencySelect");
-    const evalPrevBtn = document.getElementById("evalPrevBtn");
-    const evalNextBtn = document.getElementById("evalNextBtn");
-
-    const prevQuestionBtn = document.getElementById("prevQuestionBtn");
-    const nextQuestionBtn = document.getElementById("nextQuestionBtn");
-    const behaviorBtn = document.getElementById("behaviorBtn");
-    const saveSessionBtn = document.getElementById("saveSessionBtn");
-    const openHistoryBtn = document.getElementById("openHistoryBtn");
-    const exportPdfBtn = document.getElementById("exportPdfBtn");
-
-    const candidateName = document.getElementById("candidateName");
-    const candidateMeta = document.getElementById("candidateMeta");
-    const interviewerName = document.getElementById("interviewerName");
-    const interviewDate = document.getElementById("interviewDate");
-    const scoreSelect = document.getElementById("scoreSelect");
-    const memoInput = document.getElementById("memoInput");
-    const finalDecision = document.getElementById("finalDecision");
-    const finalComment = document.getElementById("finalComment");
-
-    const behaviorModal = document.getElementById("behaviorModal");
-    const behaviorModalContent = document.getElementById("behaviorModalContent");
-    const closeBehaviorModal = document.getElementById("closeBehaviorModal");
-
-    const historyModal = document.getElementById("historyModal");
-    const closeHistoryModal = document.getElementById("closeHistoryModal");
-    const historyList = document.getElementById("historyList");
-    const historySearch = document.getElementById("historySearch");
-    const historySort = document.getElementById("historySort");
-    const clearRecordsBtn = document.getElementById("clearRecordsBtn");
-
-    const loadedSessionBanner = document.getElementById("loadedSessionBanner");
-    const loadedSessionText = document.getElementById("loadedSessionText");
-
-    let currentQuestionIndex = 0;
-    let currentEvalCompetency = "";
-    let draftEvaluations = {};
-    let loadedSessionId = null;
-
-    const LS_KEY_SESSIONS = "dozn_interview_sessions_v6";
-    const LS_KEY_DRAFT = "dozn_interview_draft_v6";
-
-    function todayISO() {
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    function safeText(v) {
-      return (v ?? "").toString().trim();
-    }
-
-    function escapeHtml(str) {
-      return safeText(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-
-    function scoreLabel(score) {
-      const map = {
-        1: "부족함",
-        2: "개선필요",
-        3: "기대충족",
-        4: "기대초과",
-        5: "탁월"
-      };
-      return map[Number(score)] || "-";
-    }
-
-    function getRoleCompetencies(role) {
-      return Object.keys(window.interviewData?.[role]?.competencies || {});
-    }
-
-    function getQuestionContext() {
-      const role = roleSelect.value;
-      const comp = competencySelect.value;
-      const compData = window.interviewData?.[role]?.competencies?.[comp];
-      const sets = compData?.questionSets || [];
-      const qSet = sets[currentQuestionIndex] || null;
-      return { role, comp, compData, sets, qSet };
-    }
-
-    function getDraftKey(role, comp) {
-      return `${role}__${comp}`;
-    }
-
-    function getSessionKey() {
-      return [
-        safeText(candidateName.value),
-        safeText(candidateMeta.value),
-        safeText(interviewerName.value),
-        safeText(interviewDate.value),
-        safeText(roleSelect.value)
-      ].join("||");
-    }
-
-    function updateLoadedSessionBanner() {
-      if (!loadedSessionId) {
-        loadedSessionBanner.classList.add("hidden");
-        loadedSessionText.textContent = "-";
-        return;
+      * {
+        box-sizing: border-box;
       }
 
-      const session = loadSessions().find(s => s.id === loadedSessionId);
-      if (!session) {
-        loadedSessionId = null;
-        loadedSessionBanner.classList.add("hidden");
-        loadedSessionText.textContent = "-";
-        saveDraft();
-        return;
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Pretendard", "Noto Sans KR", sans-serif;
+        color: #1e293b;
+        background: linear-gradient(135deg, #edf5ff 0%, #dcecff 40%, #eef3ff 100%);
       }
 
-      loadedSessionText.textContent = `${session.candidate?.name || "-"} · ${session.role || "-"} · ${session.date || "-"}`;
-      loadedSessionBanner.classList.remove("hidden");
-    }
-
-    function loadSessions() {
-      try {
-        const raw = localStorage.getItem(LS_KEY_SESSIONS);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function saveSessions(sessions) {
-      localStorage.setItem(LS_KEY_SESSIONS, JSON.stringify(sessions));
-    }
-
-    function findCurrentSession() {
-      const sessions = loadSessions();
-
-      if (loadedSessionId) {
-        const loaded = sessions.find(s => s.id === loadedSessionId);
-        if (loaded) return loaded;
+      body {
+        min-height: 100vh;
       }
 
-      const key = getSessionKey();
-      return sessions.find(s => s.sessionKey === key);
-    }
-
-    function loadDraft() {
-      try {
-        const raw = localStorage.getItem(LS_KEY_DRAFT);
-        if (!raw) return null;
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-
-    function saveDraft() {
-      saveCurrentEvaluationDraft();
-
-      const draft = {
-        candidateName: safeText(candidateName.value),
-        candidateMeta: safeText(candidateMeta.value),
-        interviewerName: safeText(interviewerName.value),
-        interviewDate: safeText(interviewDate.value),
-        role: safeText(roleSelect.value),
-        questionCompetency: safeText(competencySelect.value),
-        evalCompetency: safeText(currentEvalCompetency),
-        finalDecision: safeText(finalDecision.value),
-        finalComment: safeText(finalComment.value),
-        currentQuestionIndex,
-        draftEvaluations,
-        loadedSessionId
-      };
-      localStorage.setItem(LS_KEY_DRAFT, JSON.stringify(draft));
-    }
-
-    function initRoleOptions() {
-      roleSelect.innerHTML = "";
-      const roles = Object.keys(window.interviewData || {});
-      roles.forEach((role) => {
-        const opt = document.createElement("option");
-        opt.value = role;
-        opt.textContent = role;
-        roleSelect.appendChild(opt);
-      });
-    }
-
-    function updateQuestionCompetencyOptions(preferred = "") {
-      const role = roleSelect.value;
-      const list = getRoleCompetencies(role);
-
-      competencySelect.innerHTML = "";
-      list.forEach((comp) => {
-        const opt = document.createElement("option");
-        opt.value = comp;
-        opt.textContent = comp;
-        competencySelect.appendChild(opt);
-      });
-
-      if (preferred && list.includes(preferred)) {
-        competencySelect.value = preferred;
-      } else if (list.length) {
-        competencySelect.value = list[0];
-      }
-    }
-
-    function updateEvalCompetencyOptions(preferred = "") {
-      const role = roleSelect.value;
-      const list = getRoleCompetencies(role);
-
-      evalCompetencySelect.innerHTML = "";
-      list.forEach((comp) => {
-        const opt = document.createElement("option");
-        opt.value = comp;
-        opt.textContent = comp;
-        evalCompetencySelect.appendChild(opt);
-      });
-
-      if (preferred && list.includes(preferred)) {
-        currentEvalCompetency = preferred;
-      } else if (currentEvalCompetency && list.includes(currentEvalCompetency)) {
-      } else {
-        currentEvalCompetency = list[0] || "";
+      button,
+      input,
+      textarea {
+        font: inherit;
       }
 
-      if (currentEvalCompetency) {
-        evalCompetencySelect.value = currentEvalCompetency;
-      }
-      updateEvalNavButtons();
-    }
-
-    function updateEvalNavButtons() {
-      const list = getRoleCompetencies(roleSelect.value);
-      const idx = list.indexOf(currentEvalCompetency);
-
-      evalPrevBtn.disabled = idx <= 0;
-      evalNextBtn.disabled = idx < 0 || idx === list.length - 1;
-
-      evalPrevBtn.classList.toggle("opacity-50", evalPrevBtn.disabled);
-      evalNextBtn.classList.toggle("opacity-50", evalNextBtn.disabled);
-    }
-
-    function validateQuestionIndex() {
-      const { sets } = getQuestionContext();
-      if (!sets.length) {
-        currentQuestionIndex = 0;
-        return;
-      }
-      if (currentQuestionIndex < 0) currentQuestionIndex = 0;
-      if (currentQuestionIndex > sets.length - 1) currentQuestionIndex = sets.length - 1;
-    }
-
-    function hydrateDraftFromSavedSessionIfNeeded() {
-      const session = findCurrentSession();
-      if (!session) return;
-
-      if (!safeText(finalDecision.value)) finalDecision.value = session.finalDecision || "";
-      if (!safeText(finalComment.value)) finalComment.value = session.finalComment || "";
-
-      (session.evaluations || []).forEach((ev) => {
-        const key = getDraftKey(ev.role, ev.competency);
-        if (!draftEvaluations[key]) {
-          draftEvaluations[key] = {
-            role: ev.role,
-            competency: ev.competency,
-            score: ev.score ? String(ev.score) : "",
-            memo: ev.memo || "",
-            updatedAt: ev.updatedAt || session.updatedAt || session.createdAt
-          };
-        }
-      });
-    }
-
-    function saveCurrentEvaluationDraft() {
-      const role = roleSelect.value;
-      const comp = currentEvalCompetency;
-      if (!role || !comp) return;
-
-      const key = getDraftKey(role, comp);
-      draftEvaluations[key] = {
-        role,
-        competency: comp,
-        score: safeText(scoreSelect.value),
-        memo: safeText(memoInput.value),
-        updatedAt: new Date().toISOString()
-      };
-    }
-
-    function loadEvaluationDraftToForm() {
-      const role = roleSelect.value;
-      const comp = currentEvalCompetency;
-      if (!role || !comp) {
-        scoreSelect.value = "";
-        memoInput.value = "";
-        return;
+      .bg-orb-1,
+      .bg-orb-2,
+      .bg-orb-3 {
+        position: fixed;
+        pointer-events: none;
+        filter: blur(40px);
+        z-index: 0;
       }
 
-      hydrateDraftFromSavedSessionIfNeeded();
-
-      const key = getDraftKey(role, comp);
-      const draft = draftEvaluations[key];
-
-      scoreSelect.value = draft?.score || "";
-      memoInput.value = draft?.memo || "";
-      evalCompetencySelect.value = comp;
-      updateEvalNavButtons();
-    }
-
-    function moveEvalCompetency(direction) {
-      saveCurrentEvaluationDraft();
-
-      const list = getRoleCompetencies(roleSelect.value);
-      const idx = list.indexOf(currentEvalCompetency);
-      if (idx < 0) return;
-
-      const nextIdx = idx + direction;
-      if (nextIdx < 0 || nextIdx >= list.length) return;
-
-      currentEvalCompetency = list[nextIdx];
-      evalCompetencySelect.value = currentEvalCompetency;
-      loadEvaluationDraftToForm();
-      saveDraft();
-    }
-
-    function renderContent() {
-      validateQuestionIndex();
-      const { role, comp, compData, sets } = getQuestionContext();
-      const qSet = sets[currentQuestionIndex];
-
-      if (!role || !comp || !compData || !qSet) {
-        contentArea.innerHTML = `
-          <div class="rounded-2xl bg-white p-6 shadow-sm border border-slate-200 text-sm text-slate-600">
-            표시할 면접 질문 데이터가 없습니다.<br />
-            interview-data.js 파일에 직무/역량 데이터가 정상적으로 들어있는지 확인해주세요.
-          </div>
-        `;
-        return;
+      .bg-orb-1 {
+        top: -80px;
+        left: -80px;
+        width: 340px;
+        height: 340px;
+        border-radius: 48px;
+        background: radial-gradient(circle at top left, rgba(255, 232, 246, 0.65), rgba(255, 255, 255, 0) 70%);
       }
 
-      contentArea.innerHTML = `
-        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-          <h2 class="text-lg font-semibold text-slate-900 mb-1">[${escapeHtml(role)}] ${escapeHtml(comp)}</h2>
-          <p class="text-sm text-slate-700 mb-2">${escapeHtml(compData.definition || "")}</p>
-          <p class="text-xs text-slate-500">질문 세트: ${currentQuestionIndex + 1} / ${sets.length}</p>
-        </div>
-
-        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-          <h3 class="text-sm font-semibold text-slate-900 mb-2">✅ 메인 질문</h3>
-          <p class="text-sm text-slate-800">${escapeHtml(qSet.mainQuestion || "")}</p>
-        </div>
-
-        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-          <h3 class="text-sm font-semibold text-slate-900 mb-2">🔎 꼬리질문 (더 깊이 파고들 때)</h3>
-          <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
-            ${(qSet.followUps || []).map(q => `<li>${escapeHtml(q)}</li>`).join("")}
-          </ul>
-        </div>
-
-        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-          <h3 class="text-sm font-semibold text-slate-900 mb-2">👀 관찰 포인트</h3>
-          <ul class="list-disc pl-5 space-y-1 text-sm text-slate-800">
-            ${(qSet.observationPoints || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-          </ul>
-        </div>
-
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="rounded-2xl bg-emerald-50 p-4 border border-emerald-200">
-            <h3 class="text-sm font-semibold text-emerald-900 mb-2">💚 긍정 신호</h3>
-            <ul class="list-disc pl-5 space-y-1 text-sm text-emerald-900">
-              ${(qSet.positiveSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-            </ul>
-          </div>
-
-          <div class="rounded-2xl bg-rose-50 p-4 border border-rose-200">
-            <h3 class="text-sm font-semibold text-rose-900 mb-2">⚠️ 우려 신호</h3>
-            <ul class="list-disc pl-5 space-y-1 text-sm text-rose-900">
-              ${(qSet.negativeSignals || []).map(t => `<li>${escapeHtml(t)}</li>`).join("")}
-            </ul>
-          </div>
-        </div>
-
-        <div class="rounded-2xl bg-white p-4 shadow-sm border border-slate-200">
-          <h3 class="text-sm font-semibold text-slate-900 mb-2">📊 레벨 구분 기준 (주니어 vs 시니어)</h3>
-          <div class="grid gap-4 md:grid-cols-2 text-sm text-slate-800">
-            <div>
-              <div class="font-semibold mb-1">주니어 기대 행동</div>
-              <p>${escapeHtml(compData.levelCriteria?.junior || "-")}</p>
-            </div>
-            <div>
-              <div class="font-semibold mb-1">시니어 기대 행동</div>
-              <p>${escapeHtml(compData.levelCriteria?.senior || "-")}</p>
-            </div>
-          </div>
-        </div>
-      `;
-
-      prevQuestionBtn.disabled = currentQuestionIndex === 0;
-      nextQuestionBtn.disabled = currentQuestionIndex === sets.length - 1;
-      prevQuestionBtn.classList.toggle("opacity-50", prevQuestionBtn.disabled);
-      nextQuestionBtn.classList.toggle("opacity-50", nextQuestionBtn.disabled);
-    }
-
-    function openBehaviorModal() {
-      const { comp, compData } = getQuestionContext();
-      if (!comp || !compData?.behaviorIndicators) {
-        alert("이 역량의 행동지표 정보가 아직 없습니다.");
-        return;
+      .bg-orb-2 {
+        top: 40px;
+        right: 0;
+        width: 420px;
+        height: 420px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(176, 213, 255, 0.35), rgba(255, 255, 255, 0) 70%);
       }
 
-      const bi = compData.behaviorIndicators;
-      behaviorModalContent.innerHTML = `
-        <p class="font-semibold mb-1">${escapeHtml(comp)}</p>
-        <p class="text-slate-700 mb-2"><span class="font-semibold">정의 :</span> ${escapeHtml(bi.definition || "")}</p>
-        <ul class="list-disc pl-5 space-y-1">
-          ${(bi.items || []).map(item => `<li>${escapeHtml(item)}</li>`).join("")}
-        </ul>
-      `;
-
-      behaviorModal.classList.remove("hidden");
-      behaviorModal.classList.add("flex");
-    }
-
-    function closeBehavior() {
-      behaviorModal.classList.add("hidden");
-      behaviorModal.classList.remove("flex");
-    }
-
-    function buildEvaluationsForSave() {
-      saveCurrentEvaluationDraft();
-
-      const role = roleSelect.value;
-      const rows = Object.values(draftEvaluations)
-        .filter(ev => ev.role === role)
-        .filter(ev => safeText(ev.score) || safeText(ev.memo))
-        .map(ev => ({
-          role: ev.role,
-          competency: ev.competency,
-          score: ev.score ? Number(ev.score) : null,
-          memo: ev.memo || "",
-          updatedAt: ev.updatedAt || new Date().toISOString()
-        }));
-
-      const roleComps = getRoleCompetencies(role);
-      rows.sort((a, b) => roleComps.indexOf(a.competency) - roleComps.indexOf(b.competency));
-
-      return rows;
-    }
-
-    function saveInterviewSession() {
-      if (!safeText(candidateName.value)) {
-        alert("후보자명을 입력해주세요.");
-        return;
-      }
-      if (!safeText(interviewerName.value)) {
-        alert("면접관명을 입력해주세요.");
-        return;
-      }
-      if (!safeText(interviewDate.value)) {
-        alert("면접일을 선택해주세요.");
-        return;
-      }
-      if (!safeText(roleSelect.value)) {
-        alert("직무를 선택해주세요.");
-        return;
+      .bg-orb-3 {
+        bottom: 0;
+        left: 30%;
+        width: 300px;
+        height: 300px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(220, 236, 255, 0.55), rgba(255, 255, 255, 0) 72%);
       }
 
-      const evaluations = buildEvaluationsForSave();
-      if (!evaluations.length) {
-        alert("저장할 역량 평가가 없습니다. 상단 역량 평가 칸반에 점수 또는 메모를 입력해주세요.");
-        return;
+      .app-shell {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
       }
 
-      const sessions = loadSessions();
-      const key = getSessionKey();
+      .line-clamp-none {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bg-orb-1"></div>
+    <div class="bg-orb-2"></div>
+    <div class="bg-orb-3"></div>
 
-      let session = null;
+    <div id="app" class="app-shell"></div>
 
-      if (loadedSessionId) {
-        session = sessions.find(s => s.id === loadedSessionId);
+    <script src="interview-data.js"></script>
+    <script>
+      const app = document.getElementById("app");
+
+      let currentPage = "landing";
+      let selectedPositionId = window.INTERVIEW_DATA.positions[0]?.id || "";
+      let activeNav =
+        window.INTERVIEW_DATA.positions[0]?.competencies?.[0]?.id || "final-review";
+      let showPdfPreview = false;
+
+      function getSelectedPosition() {
+        return (
+          window.INTERVIEW_DATA.positions.find(
+            (position) => position.id === selectedPositionId
+          ) || window.INTERVIEW_DATA.positions[0]
+        );
       }
 
-      if (!session) {
-        session = sessions.find(s => s.sessionKey === key);
+      function getCompetencies() {
+        return getSelectedPosition()?.competencies || [];
       }
 
-      if (!session) {
-        session = {
-          id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2),
-          sessionKey: key,
-          createdAt: new Date().toISOString()
-        };
-        sessions.push(session);
+      function getNavItems() {
+        return [
+          ...getCompetencies().map((item) => ({
+            id: item.id,
+            name: item.name,
+            order: item.order,
+          })),
+          {
+            id: "final-review",
+            name: "최종평가",
+            order: "면접 결과 정리",
+          },
+        ];
       }
 
-      session.sessionKey = key;
-      session.updatedAt = new Date().toISOString();
-      session.candidate = {
-        name: safeText(candidateName.value),
-        meta: safeText(candidateMeta.value)
-      };
-      session.interviewer = safeText(interviewerName.value);
-      session.date = safeText(interviewDate.value);
-      session.role = safeText(roleSelect.value);
-      session.finalDecision = safeText(finalDecision.value);
-      session.finalComment = safeText(finalComment.value);
-      session.evaluations = evaluations;
-
-      loadedSessionId = session.id;
-
-      saveSessions(sessions);
-      saveDraft();
-      updateLoadedSessionBanner();
-      alert("✅ 면접 결과가 저장되었습니다.");
-    }
-
-    function buildSessionPdfHtml(session) {
-      const evaluationCards = (session.evaluations || []).map((ev, idx) => `
-        <div class="card">
-          <h3>${idx + 1}. ${escapeHtml(ev.competency)}</h3>
-          <p><strong>직무:</strong> ${escapeHtml(ev.role)}</p>
-          <p><strong>점수:</strong> ${escapeHtml(scoreLabel(ev.score))}</p>
-          <p><strong>메모:</strong><br>${escapeHtml(ev.memo || "(메모 없음)").replace(/\n/g, "<br>")}</p>
-        </div>
-      `).join("");
-
-      return `
-        <html>
-          <head>
-            <title>면접 평가 결과</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
-              h1 { font-size: 24px; margin-bottom: 8px; }
-              h2 { font-size: 16px; margin-bottom: 20px; color: #475569; }
-              .meta { margin-bottom: 24px; line-height: 1.7; }
-              .section-title { font-size: 18px; margin: 24px 0 12px; }
-              .summary-box, .card {
-                border: 1px solid #cbd5e1;
-                border-radius: 12px;
-                padding: 16px;
-                margin-bottom: 16px;
-                page-break-inside: avoid;
-              }
-              .card h3 { margin: 0 0 10px 0; font-size: 18px; }
-              p { margin: 6px 0; line-height: 1.6; }
-            </style>
-          </head>
-          <body>
-            <h1>역량 기반 면접 평가 결과</h1>
-            <h2>${escapeHtml(session.candidate?.name || "-")}</h2>
-
-            <div class="meta">
-              <div><strong>지원 포지션/메모:</strong> ${escapeHtml(session.candidate?.meta || "-")}</div>
-              <div><strong>면접관:</strong> ${escapeHtml(session.interviewer || "-")}</div>
-              <div><strong>면접일:</strong> ${escapeHtml(session.date || "-")}</div>
-              <div><strong>직무:</strong> ${escapeHtml(session.role || "-")}</div>
-            </div>
-
-            <div class="section-title">최종 평가</div>
-            <div class="summary-box">
-              <p><strong>최종 결과:</strong> ${escapeHtml(session.finalDecision || "-")}</p>
-              <p><strong>총평:</strong><br>${escapeHtml(session.finalComment || "(총평 없음)").replace(/\n/g, "<br>")}</p>
-            </div>
-
-            <div class="section-title">역량별 평가</div>
-            ${evaluationCards}
-          </body>
-        </html>
-      `;
-    }
-
-    function printSessionToPdf(session) {
-      if (!session) {
-        alert("출력할 저장 기록을 찾을 수 없습니다.");
-        return;
+      function setSelectedPosition(id) {
+        selectedPositionId = id;
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+        render();
       }
 
-      const printWindow = window.open("", "_blank", "width=900,height=1000");
-      printWindow.document.write(buildSessionPdfHtml(session));
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-    }
+      function startGuide() {
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+        currentPage = "guide";
+        render();
 
-    function exportCurrentSessionToPdf() {
-      const session = findCurrentSession();
-      if (!session) {
-        alert("현재 후보자 기준 저장된 세션이 없습니다. 먼저 면접 결과를 저장해주세요.");
-        return;
-      }
-      printSessionToPdf(session);
-    }
-
-    function loadSessionIntoForm(sessionId) {
-      const sessions = loadSessions();
-      const session = sessions.find(s => s.id === sessionId);
-
-      if (!session) {
-        alert("불러올 저장 기록을 찾을 수 없습니다.");
-        return;
+        setTimeout(() => {
+          scrollToSection(activeNav);
+        }, 50);
       }
 
-      saveCurrentEvaluationDraft();
-
-      candidateName.value = session.candidate?.name || "";
-      candidateMeta.value = session.candidate?.meta || "";
-      interviewerName.value = session.interviewer || "";
-      interviewDate.value = session.date || todayISO();
-      finalDecision.value = session.finalDecision || "";
-      finalComment.value = session.finalComment || "";
-
-      if (session.role && window.interviewData?.[session.role]) {
-        roleSelect.value = session.role;
+      function goLanding() {
+        currentPage = "landing";
+        showPdfPreview = false;
+        render();
       }
 
-      updateQuestionCompetencyOptions();
-      updateEvalCompetencyOptions();
-
-      Object.keys(draftEvaluations).forEach(key => {
-        const item = draftEvaluations[key];
-        if (item?.role === session.role) {
-          delete draftEvaluations[key];
-        }
-      });
-
-      (session.evaluations || []).forEach(ev => {
-        const key = getDraftKey(ev.role, ev.competency);
-        draftEvaluations[key] = {
-          role: ev.role,
-          competency: ev.competency,
-          score: ev.score ? String(ev.score) : "",
-          memo: ev.memo || "",
-          updatedAt: ev.updatedAt || session.updatedAt || session.createdAt
-        };
-      });
-
-      const roleCompetencies = getRoleCompetencies(session.role || "");
-      const firstComp = session.evaluations?.[0]?.competency || roleCompetencies[0] || "";
-
-      if (firstComp) {
-        updateQuestionCompetencyOptions(firstComp);
-        currentEvalCompetency = firstComp;
-        updateEvalCompetencyOptions(firstComp);
+      function openPdfPreview() {
+        showPdfPreview = true;
+        render();
       }
 
-      currentQuestionIndex = 0;
-      loadedSessionId = session.id;
-      loadEvaluationDraftToForm();
-      renderContent();
-      updateLoadedSessionBanner();
-      saveDraft();
-      closeHistory();
-
-      alert(`✅ ${session.candidate?.name || "후보자"}님의 저장 기록을 불러왔습니다.`);
-    }
-
-    function deleteSession(sessionId) {
-      const sessions = loadSessions();
-      const session = sessions.find(s => s.id === sessionId);
-
-      if (!session) {
-        alert("삭제할 저장 기록을 찾을 수 없습니다.");
-        return;
+      function closePdfPreview() {
+        showPdfPreview = false;
+        render();
       }
 
-      const ok = confirm(`"${session.candidate?.name || "후보자"}" 기록을 삭제할까요?`);
-      if (!ok) return;
+      function scrollToSection(id) {
+        activeNav = id;
+        render();
 
-      const nextSessions = sessions.filter(s => s.id !== sessionId);
-      saveSessions(nextSessions);
-
-      if (loadedSessionId === sessionId) {
-        loadedSessionId = null;
-        updateLoadedSessionBanner();
-        saveDraft();
+        setTimeout(() => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 10);
       }
 
-      renderHistory();
-      alert("🗑️ 기록이 삭제되었습니다.");
-    }
+      function renderLanding() {
+        const data = window.INTERVIEW_DATA;
 
-    function renderHistory() {
-      const q = safeText(historySearch.value).toLowerCase();
-      const sort = historySort.value;
+        return `
+          <div class="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 md:px-10 lg:px-14">
+            <div class="mx-auto w-full max-w-4xl rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_20px_60px_rgba(81,116,173,0.12)] backdrop-blur md:p-8">
+              <div class="mb-8 text-center">
+                <p class="mb-3 text-sm font-medium tracking-[0.18em] text-slate-500">DOZN INTERVIEW GUIDE</p>
+                <h1 class="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">${data.siteTitle}</h1>
+                <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+                  ${data.siteDescription}
+                </p>
+              </div>
 
-      let sessions = loadSessions();
+              <div class="mx-auto max-w-2xl rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-sm md:p-7">
+                <div class="mb-5 text-center">
+                  <h2 class="text-2xl font-semibold text-slate-900">${data.labels.openPositions}</h2>
+                  <p class="mt-2 text-sm text-slate-500">${data.labels.selectPositionGuide}</p>
+                </div>
 
-      sessions = sessions.filter(s => {
-        const evaluationBlob = (s.evaluations || [])
-          .map(ev => [ev.role, ev.competency, ev.memo, ev.score].join(" "))
-          .join(" ");
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  ${data.positions
+                    .map(
+                      (position) => `
+                    <button
+                      onclick="setSelectedPosition('${position.id}')"
+                      class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
+                        selectedPositionId === position.id
+                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
+                      }"
+                    >
+                      ${position.name}
+                    </button>
+                  `
+                    )
+                    .join("")}
+                </div>
 
-        const blob = [
-          s?.candidate?.name,
-          s?.candidate?.meta,
-          s?.interviewer,
-          s?.role,
-          s?.date,
-          s?.finalDecision,
-          s?.finalComment,
-          evaluationBlob
-        ].join(" ").toLowerCase();
-
-        return blob.includes(q);
-      });
-
-      sessions.sort((a, b) => {
-        const ta = new Date(a.updatedAt || a.createdAt).getTime();
-        const tb = new Date(b.updatedAt || b.createdAt).getTime();
-        return sort === "oldest" ? ta - tb : tb - ta;
-      });
-
-      if (!sessions.length) {
-        historyList.innerHTML = `<div class="p-4 text-sm text-slate-600">저장된 기록이 없습니다.</div>`;
-        return;
-      }
-
-      historyList.innerHTML = sessions.map(s => `
-        <details class="border-b border-slate-200 p-4">
-          <summary class="cursor-pointer">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-slate-900">${escapeHtml(s.candidate?.name || "-")} · ${escapeHtml(s.role || "-")}</div>
-                <div class="text-xs text-slate-600 mt-1">
-                  ${escapeHtml(s.date || "-")} · 면접관: ${escapeHtml(s.interviewer || "-")} · 평가 역량 수: ${(s.evaluations || []).length}
+                <div class="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
+                  <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
+                  <button
+                    onclick="startGuide()"
+                    class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
+                  >
+                    ${data.labels.startGuide}
+                  </button>
                 </div>
               </div>
-              <div class="text-xs text-slate-500">${escapeHtml(s.finalDecision || "-")}</div>
             </div>
-          </summary>
-
-          <div class="mt-3 grid gap-3">
-            <div class="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                class="load-session-btn text-xs px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50"
-                data-session-id="${escapeHtml(s.id)}">
-                📥 불러오기
-              </button>
-
-              <button
-                type="button"
-                class="pdf-session-btn text-xs px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50"
-                data-session-id="${escapeHtml(s.id)}">
-                🖨️ PDF
-              </button>
-
-              <button
-                type="button"
-                class="delete-session-btn text-xs px-3 py-2 rounded-xl border border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
-                data-session-id="${escapeHtml(s.id)}">
-                🗑️ 삭제
-              </button>
-            </div>
-
-            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
-              <div class="text-xs font-semibold text-slate-700 mb-1">🧾 최종 평가</div>
-              <div class="text-sm text-slate-800"><strong>최종 결과:</strong> ${escapeHtml(s.finalDecision || "-")}</div>
-              <div class="text-sm text-slate-800 whitespace-pre-wrap mt-2">${escapeHtml(s.finalComment || "(총평 없음)")}</div>
-            </div>
-
-            ${(s.evaluations || []).map(ev => `
-              <div class="rounded-xl bg-white border border-slate-200 p-3">
-                <div class="text-sm font-semibold text-slate-900">${escapeHtml(ev.competency)}</div>
-                <div class="text-xs text-slate-600 mt-1">점수: ${scoreLabel(ev.score)}</div>
-                <div class="text-xs text-slate-700 mt-2 font-medium">메모</div>
-                <div class="text-sm text-slate-800 whitespace-pre-wrap">${escapeHtml(ev.memo || "(메모 없음)")}</div>
-              </div>
-            `).join("")}
           </div>
-        </details>
-      `).join("");
-
-      historyList.querySelectorAll(".load-session-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          loadSessionIntoForm(btn.dataset.sessionId);
-        });
-      });
-
-      historyList.querySelectorAll(".pdf-session-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const sessions = loadSessions();
-          const session = sessions.find(s => s.id === btn.dataset.sessionId);
-          printSessionToPdf(session);
-        });
-      });
-
-      historyList.querySelectorAll(".delete-session-btn").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          deleteSession(btn.dataset.sessionId);
-        });
-      });
-    }
-
-    function openHistory() {
-      renderHistory();
-      historyModal.classList.remove("hidden");
-      historyModal.classList.add("flex");
-    }
-
-    function closeHistory() {
-      historyModal.classList.add("hidden");
-      historyModal.classList.remove("flex");
-    }
-
-    function clearAllRecords() {
-      const ok = confirm("저장된 모든 면접 세션 기록을 삭제할까요?");
-      if (!ok) return;
-      localStorage.removeItem(LS_KEY_SESSIONS);
-      loadedSessionId = null;
-      updateLoadedSessionBanner();
-      saveDraft();
-      renderHistory();
-    }
-
-    function goPrevQuestion() {
-      const { sets } = getQuestionContext();
-      if (!sets.length) return;
-      if (currentQuestionIndex > 0) {
-        currentQuestionIndex -= 1;
-        renderContent();
-        saveDraft();
+        `;
       }
-    }
 
-    function goNextQuestion() {
-      const { sets } = getQuestionContext();
-      if (!sets.length) return;
-      if (currentQuestionIndex < sets.length - 1) {
-        currentQuestionIndex += 1;
-        renderContent();
-        saveDraft();
+      function renderGuide() {
+        const data = window.INTERVIEW_DATA;
+        const selected = getSelectedPosition();
+        const competencies = getCompetencies();
+        const navItems = getNavItems();
+
+        return `
+          <div class="relative mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-14">
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="mb-2 inline-flex items-center rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-medium text-slate-500 backdrop-blur">
+                  선택 포지션 · ${selected.name}
+                </div>
+                <h2 class="text-3xl font-semibold tracking-tight text-slate-900">
+                  ${selected.guideTitle || `${selected.name} 구조화 면접 가이드`}
+                </h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600">
+                  ${selected.summary || ""}
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  onclick="goLanding()"
+                  class="rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur"
+                >
+                  ← 포지션 다시 선택
+                </button>
+                <button class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm">
+                  ${data.labels.cautionButton}
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-8 grid gap-4 lg:grid-cols-3">
+              <div class="rounded-3xl border border-white/70 bg-white/78 p-5 shadow-sm backdrop-blur">
+                <p class="text-sm font-semibold text-slate-900">${data.labels.coreCompetencies}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  ${competencies
+                    .map(
+                      (item) => `
+                    <span class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                      ${item.name}
+                    </span>
+                  `
+                    )
+                    .join("")}
+                </div>
+              </div>
+
+              <div class="rounded-3xl border border-white/70 bg-white/78 p-5 shadow-sm backdrop-blur">
+                <p class="text-sm font-semibold text-slate-900">${data.labels.interviewRules}</p>
+                <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                  ${data.interviewRules.map((rule) => `<li>${rule}</li>`).join("")}
+                </ul>
+              </div>
+
+              <div class="rounded-3xl border border-white/70 bg-white/78 p-5 shadow-sm backdrop-blur">
+                <p class="text-sm font-semibold text-slate-900">${data.labels.scoreScale}</p>
+                <div class="mt-3 grid grid-cols-5 gap-2 text-center text-xs text-slate-600">
+                  ${[1, 2, 3, 4, 5]
+                    .map(
+                      (score) => `
+                    <div class="rounded-2xl bg-slate-100 px-2 py-3 font-semibold">
+                      ${score}점
+                    </div>
+                  `
+                    )
+                    .join("")}
+                </div>
+                <p class="mt-3 text-sm leading-6 text-slate-500">${data.scoreGuide}</p>
+              </div>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
+              <aside class="h-fit rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur xl:sticky xl:top-6">
+                <p class="mb-3 px-2 text-sm font-semibold text-slate-900">${data.labels.questionSet}</p>
+                <div class="space-y-2">
+                  ${navItems
+                    .map(
+                      (item) => `
+                    <button
+                      onclick="scrollToSection('${item.id}')"
+                      class="w-full rounded-2xl px-4 py-3 text-left transition ${
+                        activeNav === item.id
+                          ? "bg-blue-50 text-blue-700"
+                          : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                      }"
+                    >
+                      <div class="text-sm font-semibold">${item.name}</div>
+                      <div class="mt-1 text-xs text-slate-500">${item.order}</div>
+                    </button>
+                  `
+                    )
+                    .join("")}
+                </div>
+              </aside>
+
+              <main class="space-y-6">
+                ${competencies
+                  .map(
+                    (section) => `
+                  <section
+                    id="${section.id}"
+                    class="rounded-[30px] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur md:p-6"
+                  >
+                    <div class="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div>
+                        <p class="text-sm font-medium text-blue-600">${section.order}</p>
+                        <h3 class="mt-1 text-2xl font-semibold text-slate-900">${section.name}</h3>
+                      </div>
+                      <span class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">질문 ${section.questions.length}개</span>
+                    </div>
+
+                    <div class="space-y-5">
+                      ${section.questions
+                        .map(
+                          (q) => `
+                        <div class="rounded-[26px] border border-slate-200/80 bg-slate-50/70 p-5">
+                          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                              ${q.type}
+                            </span>
+                            <div class="flex gap-2">
+                              ${[1, 2, 3, 4, 5]
+                                .map(
+                                  (s) => `
+                                <button class="h-9 w-9 rounded-full border text-sm font-semibold ${
+                                  s === 4
+                                    ? "border-blue-400 bg-blue-50 text-blue-700"
+                                    : "border-slate-200 bg-white text-slate-500"
+                                }">
+                                  ${s}
+                                </button>
+                              `
+                                )
+                                .join("")}
+                            </div>
+                          </div>
+
+                          <div class="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                            <div>
+                              <p class="text-sm font-semibold text-slate-500">${data.labels.mainQuestion}</p>
+                              <p class="mt-2 text-lg font-medium leading-8 text-slate-900">${q.main}</p>
+
+                              <div class="mt-5">
+                                <p class="text-sm font-semibold text-slate-500">${data.labels.followUp}</p>
+                                <ul class="mt-2 space-y-2 text-sm leading-7 text-slate-700">
+                                  ${q.follow
+                                    .map(
+                                      (f) => `
+                                    <li class="rounded-2xl bg-white px-4 py-3 shadow-sm">${f}</li>
+                                  `
+                                    )
+                                    .join("")}
+                                </ul>
+                              </div>
+
+                              <div class="mt-5">
+                                <p class="text-sm font-semibold text-slate-500">${data.labels.checkPoints}</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                  ${q.points
+                                    .map(
+                                      (p) => `
+                                    <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">${p}</span>
+                                  `
+                                    )
+                                    .join("")}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="space-y-4">
+                              <div class="rounded-2xl border border-blue-100 bg-white p-4">
+                                <p class="text-sm font-semibold text-slate-900">${data.labels.rubric}</p>
+                                <div class="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.purpose}</p>
+                                    <p>${q.rubric.purpose}</p>
+                                  </div>
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.goodSignal}</p>
+                                    <p>${q.rubric.good}</p>
+                                  </div>
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.averageAnswer}</p>
+                                    <p>${q.rubric.average}</p>
+                                  </div>
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.riskSignal}</p>
+                                    <p>${q.rubric.weak}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-sm font-semibold text-slate-900">${data.labels.memo}</p>
+                                <textarea
+                                  class="mt-3 h-40 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                                  placeholder="${data.labels.memoPlaceholder}"
+                                ></textarea>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      `
+                        )
+                        .join("")}
+                    </div>
+                  </section>
+                `
+                  )
+                  .join("")}
+
+                <section id="final-review" class="rounded-[30px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+                  <div class="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-medium text-blue-600">${data.labels.finalReview}</p>
+                      <h3 class="mt-1 text-2xl font-semibold text-slate-900">${data.labels.finalReview}</h3>
+                    </div>
+                    <button
+                      onclick="openPdfPreview()"
+                      class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
+                    >
+                      ${data.labels.savePdf}
+                    </button>
+                  </div>
+
+                  <div class="grid gap-4 md:grid-cols-3">
+                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.candidateName}" />
+                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.interviewer}" />
+                    <input class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.interviewDate}" />
+                  </div>
+
+                  <div class="mt-5 grid gap-4 lg:grid-cols-2">
+                    <textarea class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.overallComment}"></textarea>
+                    <textarea class="h-40 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" placeholder="${data.labels.followUpCheck}"></textarea>
+                  </div>
+
+                  <div class="mt-5">
+                    <p class="mb-3 text-sm font-semibold text-slate-900">${data.labels.finalOpinion}</p>
+                    <div class="flex flex-wrap gap-2">
+                      ${data.finalOptions
+                        .map(
+                          (label, idx) => `
+                        <button class="rounded-full px-4 py-2 text-sm font-semibold ${
+                          idx === 0 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                        }">
+                          ${label}
+                        </button>
+                      `
+                        )
+                        .join("")}
+                    </div>
+                  </div>
+                </section>
+              </main>
+            </div>
+          </div>
+        `;
       }
-    }
 
-    roleSelect.addEventListener("change", () => {
-      saveCurrentEvaluationDraft();
+      function renderPdfPreview() {
+        if (!showPdfPreview) return "";
 
-      const prevQuestionComp = competencySelect.value;
-      updateQuestionCompetencyOptions(prevQuestionComp);
+        const data = window.INTERVIEW_DATA;
+        const selected = getSelectedPosition();
+        const competencies = getCompetencies();
 
-      const prevEvalComp = currentEvalCompetency;
-      updateEvalCompetencyOptions(prevEvalComp);
-      loadEvaluationDraftToForm();
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+            <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-[32px] bg-white p-5 shadow-2xl md:p-8">
+              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <p class="text-sm font-medium text-blue-600">${data.labels.pdfPreview}</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">${data.labels.pdfSample}</h3>
+                </div>
+                <button
+                  onclick="closePdfPreview()"
+                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  ${data.labels.close}
+                </button>
+              </div>
 
-      currentQuestionIndex = 0;
-      renderContent();
-      saveDraft();
-    });
+              <div class="mx-auto max-w-3xl rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
+                <div class="border-b border-slate-200 pb-6">
+                  <p class="text-sm font-medium tracking-[0.16em] text-slate-500">DOZN INTERVIEW GUIDE</p>
+                  <h4 class="mt-3 text-3xl font-semibold text-slate-900">${selected.name} 면접 결과</h4>
+                  <div class="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
+                    <div>
+                      <p class="font-semibold text-slate-900">${data.labels.candidateName}</p>
+                      <p>${selected.pdfPreview.candidateName}</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-slate-900">${data.labels.interviewer}</p>
+                      <p>${selected.pdfPreview.interviewers}</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-slate-900">${data.labels.interviewDate}</p>
+                      <p>${selected.pdfPreview.interviewDate}</p>
+                    </div>
+                  </div>
+                </div>
 
-    competencySelect.addEventListener("change", () => {
-      currentQuestionIndex = 0;
-      renderContent();
-      saveDraft();
-    });
+                <div class="mt-6 space-y-5">
+                  ${competencies
+                    .map(
+                      (item) => `
+                    <div class="rounded-3xl border border-slate-200 p-5">
+                      <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-medium text-blue-600">${item.order}</p>
+                          <p class="text-xl font-semibold text-slate-900">${item.name}</p>
+                        </div>
+                        <div class="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">4 / 5점</div>
+                      </div>
+                      <div class="grid gap-4 md:grid-cols-[1fr_1.2fr]">
+                        <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                          <p class="font-semibold text-slate-900">${data.labels.mainQuestion}</p>
+                          <p class="mt-2">${item.questions[0]?.main || "-"}</p>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                          <p class="font-semibold text-slate-900">${data.labels.memoSummary}</p>
+                          <p class="mt-2">
+                            실제 사례를 바탕으로 상황, 판단 기준, 결과를 비교적 구체적으로 설명했으며 본인의 역할과 의사결정 흐름이 드러났습니다. 다만 일부 답변은 수치나 결과 근거가 조금 더 보완되면 좋겠습니다.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  `
+                    )
+                    .join("")}
+                </div>
 
-    evalCompetencySelect.addEventListener("change", () => {
-      saveCurrentEvaluationDraft();
-      currentEvalCompetency = evalCompetencySelect.value;
-      loadEvaluationDraftToForm();
-      saveDraft();
-    });
+                <div class="mt-6 grid gap-5 lg:grid-cols-2">
+                  <div class="rounded-3xl border border-slate-200 p-5">
+                    <p class="text-lg font-semibold text-slate-900">${data.labels.overallCommentTitle}</p>
+                    <p class="mt-3 text-sm leading-7 text-slate-700">
+                      ${selected.pdfPreview.overallComment}
+                    </p>
+                  </div>
+                  <div class="rounded-3xl border border-slate-200 p-5">
+                    <p class="text-lg font-semibold text-slate-900">${data.labels.followUpTitle}</p>
+                    <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                      ${selected.pdfPreview.followUps
+                        .map((item) => `<li>• ${item}</li>`)
+                        .join("")}
+                    </ul>
+                  </div>
+                </div>
 
-    evalPrevBtn.addEventListener("click", () => moveEvalCompetency(-1));
-    evalNextBtn.addEventListener("click", () => moveEvalCompetency(1));
+                <div class="mt-6 rounded-3xl bg-slate-900 px-6 py-5 text-white">
+                  <p class="text-sm font-medium text-slate-300">${data.labels.finalReview}</p>
+                  <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-2xl font-semibold">${selected.pdfPreview.finalDecision}</p>
+                    <p class="text-sm leading-6 text-slate-300">${data.pdfFooterNote}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
-    prevQuestionBtn.addEventListener("click", goPrevQuestion);
-    nextQuestionBtn.addEventListener("click", goNextQuestion);
-    behaviorBtn.addEventListener("click", openBehaviorModal);
-    saveSessionBtn.addEventListener("click", saveInterviewSession);
-    openHistoryBtn.addEventListener("click", openHistory);
-    exportPdfBtn.addEventListener("click", exportCurrentSessionToPdf);
+      function render() {
+        app.innerHTML = `
+          ${currentPage === "landing" ? renderLanding() : renderGuide()}
+          ${renderPdfPreview()}
+        `;
+      }
 
-    closeBehaviorModal.addEventListener("click", closeBehavior);
-    behaviorModal.addEventListener("click", (e) => {
-      if (e.target === behaviorModal) closeBehavior();
-    });
+      window.setSelectedPosition = setSelectedPosition;
+      window.startGuide = startGuide;
+      window.goLanding = goLanding;
+      window.scrollToSection = scrollToSection;
+      window.openPdfPreview = openPdfPreview;
+      window.closePdfPreview = closePdfPreview;
 
-    closeHistoryModal.addEventListener("click", closeHistory);
-    historyModal.addEventListener("click", (e) => {
-      if (e.target === historyModal) closeHistory();
-    });
-
-    historySearch.addEventListener("input", renderHistory);
-    historySort.addEventListener("change", renderHistory);
-    clearRecordsBtn.addEventListener("click", clearAllRecords);
-
-    [candidateName, candidateMeta, interviewerName, interviewDate, finalDecision, finalComment].forEach((el) => {
-      el.addEventListener("input", saveDraft);
-      el.addEventListener("change", saveDraft);
-    });
-
-    [scoreSelect, memoInput].forEach((el) => {
-      el.addEventListener("input", () => {
-        saveCurrentEvaluationDraft();
-        saveDraft();
-      });
-      el.addEventListener("change", () => {
-        saveCurrentEvaluationDraft();
-        saveDraft();
-      });
-    });
-
-    if (!interviewDate.value) {
-      interviewDate.value = todayISO();
-    }
-
-    const draft = loadDraft();
-
-    if (draft?.candidateName) candidateName.value = draft.candidateName;
-    if (draft?.candidateMeta) candidateMeta.value = draft.candidateMeta;
-    if (draft?.interviewerName) interviewerName.value = draft.interviewerName;
-    if (draft?.interviewDate) interviewDate.value = draft.interviewDate;
-    if (draft?.finalDecision) finalDecision.value = draft.finalDecision;
-    if (draft?.finalComment) finalComment.value = draft.finalComment;
-    if (draft?.draftEvaluations && typeof draft.draftEvaluations === "object") {
-      draftEvaluations = draft.draftEvaluations;
-    }
-    if (draft?.loadedSessionId) {
-      loadedSessionId = draft.loadedSessionId;
-    }
-
-    initRoleOptions();
-
-    if (draft?.role && window.interviewData?.[draft.role]) {
-      roleSelect.value = draft.role;
-    }
-
-    updateQuestionCompetencyOptions(draft?.questionCompetency || "");
-    updateEvalCompetencyOptions(draft?.evalCompetency || "");
-
-    if (typeof draft?.currentQuestionIndex === "number") {
-      currentQuestionIndex = draft.currentQuestionIndex;
-    }
-
-    hydrateDraftFromSavedSessionIfNeeded();
-    loadEvaluationDraftToForm();
-    renderContent();
-    updateLoadedSessionBanner();
-  </script>
-</body>
+      render();
+    </script>
+  </body>
 </html>
