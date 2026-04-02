@@ -615,71 +615,128 @@
         `;
       }
 
-      function renderCautionModal() {
-        if (!showCautionModal) return "";
+     function renderCautionModal() {
+  if (!showCautionModal) return "";
 
-        return `
-          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
-            <div class="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
-              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                <div>
-                  <p class="text-sm font-medium text-blue-600">면접 유의사항</p>
-                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">면접관 TO DO & NOT TO DO</h3>
-                </div>
-                <button
-                  onclick="closeCautionModal()"
-                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
-                >
-                  닫기
-                </button>
-              </div>
+  const todoItems = [
+    {
+      text: "우리 회사에 호감을 가질 수 있도록 후보자를 배려하기",
+      sub: "(예: 면접 참석에 대한 감사인사, 밝은 표정, 물 권하기 등)",
+    },
+    {
+      text: "무엇을 평가할 것인지, JD 및 평가항목/기준을 사전에 명확히 이해하기",
+    },
+    {
+      text: "면접에 활용할 질문들을 사전에 준비하기",
+    },
+    {
+      text: "모든 후보자를 공정하고 편견 없이 대하기",
+    },
+    {
+      text: "후보자가 말을 할 때는 눈을 맞추고 주의를 집중하기",
+    },
+    {
+      text: "감각이나 느낌, 추측이 아닌 관찰한 행동과 답변 내용에 초점을 맞추기",
+    },
+    {
+      text: "중요한 답변, 특이사항 등 평가의 근거가 되는 것들은 즉시 메모하기",
+    },
+  ];
 
-              <div class="rounded-[28px] bg-slate-50 p-6 md:p-8">
-                <div class="text-[15px] leading-7 text-slate-700">
-                  <p>후보자에게 긍정적인 면접 경험을 제공하는 데 가장 중요한 것은 면접관의 태도입니다.</p>
-                  <p>면접관에게는 여러 면접 중 하나이지만, <span class="font-semibold">후보자에게는 우리 회사에서 경험할 첫 면접이자 유일한 면접</span>일 수 있습니다.</p>
-                  <p>텐바이텐의 구성원이 될지 모를 후보자들이 회사에 대해 긍정적인 첫인상을 가지기 위해서는 <span class="font-semibold">면접관분들의 역할이 매우 중요합니다.</span></p>
-                </div>
+  const notTodoItems = [
+    {
+      text: "면접시간에 지각",
+    },
+    {
+      text: "후보자를 존중하지 않거나 무시하는 태도나 말투",
+    },
+    {
+      text: "차별적인 발언 (예: 성별, 출신, 스펙, 외모 등)",
+    },
+    {
+      text: "합/불 여부를 표정, 자세로 드러내기",
+    },
+    {
+      text: "특정인 또는 특정 집단을 혐오/비하하는 발언",
+    },
+    {
+      text: "후보자의 사생활에 대한 질문",
+      sub: "(예: 가족관계, 부모님 직업, 이성관계 등)",
+    },
+    {
+      text: "답변하기 어려운 난해한 질문",
+    },
+    {
+      text: "필요하게 후보자의 말꼬리 붙잡기",
+    },
+  ];
 
-                <div class="mt-6 text-3xl font-bold text-slate-900">
-                  ■ 면접관 <span class="text-red-600">TO</span> DO & <span class="text-red-600">NOT TO</span> DO
-                </div>
+  const renderList = (items) =>
+    items
+      .map(
+        (item) => `
+          <li class="flex gap-3">
+            <span class="mt-[2px] w-4 shrink-0 text-center text-slate-800">·</span>
+            <div class="min-w-0 flex-1">
+              <p class="text-[17px] leading-8 text-slate-800 break-keep">${item.text}</p>
+              ${
+                item.sub
+                  ? `<p class="mt-1 text-[15px] leading-7 text-slate-500 break-keep">${item.sub}</p>`
+                  : ""
+              }
+            </div>
+          </li>
+        `
+      )
+      .join("");
 
-                <div class="mt-8 grid gap-6 md:grid-cols-2">
-                  <div class="rounded-3xl border border-slate-200 bg-white p-6">
-                    <h4 class="mb-5 text-center text-4xl font-bold text-red-600">TO DO</h4>
-                    <ul class="space-y-3 text-[18px] leading-8 text-slate-800">
-                      <li>· 우리 회사에 호감을 가질 수 있도록 후보자를 배려하기</li>
-                      <li class="pl-4 text-[16px] leading-7 text-slate-600">(예: 면접 참석에 대한 감사인사, 밝은 표정, 물 권하기 등)</li>
-                      <li>· 무엇을 평가할 것인지, JD 및 평가항목/기준을 사전에 명확히 이해하기</li>
-                      <li>· 면접에 활용할 질문들을 사전에 준비하기</li>
-                      <li>· 모든 후보자를 공정하고 편견 없이 대하기</li>
-                      <li>· 후보자가 말을 할 때는 눈을 맞추고 주의를 집중하기</li>
-                      <li>· 감각이나 느낌, 추측이 아닌 관찰한 행동과 답변 내용에 초점을 맞추기</li>
-                      <li>· 중요한 답변, 특이사항 등 평가의 근거가 되는 것들은 즉시 메모하기</li>
-                    </ul>
-                  </div>
+  return `
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+      <div class="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
+        <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          <div>
+            <p class="text-sm font-medium text-blue-600">면접 유의사항</p>
+            <h3 class="mt-1 text-2xl font-semibold text-slate-900">면접관 TO DO & NOT TO DO</h3>
+          </div>
+          <button
+            onclick="closeCautionModal()"
+            class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+          >
+            닫기
+          </button>
+        </div>
 
-                  <div class="rounded-3xl border border-slate-200 bg-white p-6">
-                    <h4 class="mb-5 text-center text-4xl font-bold text-red-600">NOT TO DO</h4>
-                    <ul class="space-y-3 text-[18px] leading-8 text-slate-800">
-                      <li>· 면접시간에 지각</li>
-                      <li>· 후보자를 존중하지 않거나 무시하는 태도나 말투</li>
-                      <li>· 차별적인 발언 (예: 성별, 출신, 스펙, 외모 등)</li>
-                      <li>· 합/불 여부를 표정, 자세로 드러내기</li>
-                      <li>· 특정인 또는 특정 집단을 혐오/비하하는 발언</li>
-                      <li>· 후보자의 사생활에 대한 질문</li>
-                      <li class="pl-4 text-[16px] leading-7 text-slate-600">(예: 가족관계, 부모님 직업, 이성관계 등)</li>
-                      <li>· 답변하기 어려운 난해한 질문</li>
-                      <li>· 필요하게 후보자의 말꼬리 붙잡기</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+        <div class="rounded-[28px] bg-slate-50 p-6 md:p-8">
+          <div class="text-[15px] leading-7 text-slate-700 break-keep">
+            <p>후보자에게 긍정적인 면접 경험을 제공하는 데 가장 중요한 것은 면접관의 태도입니다.</p>
+            <p>면접관에게는 여러 면접 중 하나이지만, <span class="font-semibold">후보자에게는 우리 회사에서 경험할 첫 면접이자 유일한 면접</span>일 수 있습니다.</p>
+            <p>후보자들이 회사에 대해 긍정적인 첫인상을 가지기 위해서는 <span class="font-semibold">면접관의 역할이 매우 중요합니다.</span></p>
+          </div>
+
+          <div class="mt-6 text-3xl font-bold text-slate-900">
+            ■ 면접관 <span class="text-red-600">TO</span> DO & <span class="text-red-600">NOT TO</span> DO
+          </div>
+
+          <div class="mt-8 grid gap-6 md:grid-cols-2">
+            <div class="rounded-3xl border border-slate-200 bg-white p-6">
+              <h4 class="mb-5 text-center text-4xl font-bold text-red-600">TO DO</h4>
+              <ul class="space-y-4">
+                ${renderList(todoItems)}
+              </ul>
+            </div>
+
+            <div class="rounded-3xl border border-slate-200 bg-white p-6">
+              <h4 class="mb-5 text-center text-4xl font-bold text-red-600">NOT TO DO</h4>
+              <ul class="space-y-4">
+                ${renderList(notTodoItems)}
+              </ul>
             </div>
           </div>
-        `;
-      }
+        </div>
+      </div>
+    </div>
+  `;
+}
 
       function renderPdfPreview() {
         if (!showPdfPreview) return "";
