@@ -101,11 +101,48 @@
       let selectedPositionId = window.INTERVIEW_DATA.positions[0]?.id || "";
       let activeNav =
         window.INTERVIEW_DATA.positions[0]?.competencies?.[0]?.id || "final-review";
+
       let showPdfPreview = false;
       let showCautionModal = false;
+      let showAiPanel = true;
+      let resumeUploaded = true;
 
+      // 질문별 점수
       let selectedScores = {};
+
+      // 포지션별 입력값 저장
       let formStateByPosition = {};
+
+      // AI 추천 질문 적용 상태
+      let appliedAiQuestionsByPosition = {};
+
+      // 샘플용 AI 추천 질문 데이터
+      const AI_RECOMMENDATIONS = [
+        {
+          id: "ai-1",
+          competency: "문제해결",
+          question:
+            "최근 수행한 개선 과제에서 본인이 직접 우선순위를 조정했던 상황이 있다면, 어떤 기준으로 결정하셨는지 말씀해주세요.",
+          reason:
+            "이력서상 개선 경험은 보이지만, 본인의 판단 기준과 의사결정 범위는 추가 확인이 필요합니다.",
+        },
+        {
+          id: "ai-2",
+          competency: "협업 · 커뮤니케이션",
+          question:
+            "타 부서와 일정 또는 요구사항이 충돌했을 때, 어떤 방식으로 조율하고 합의점을 만들었는지 설명해주세요.",
+          reason:
+            "협업 경험은 확인되지만, 갈등 조율 방식과 커뮤니케이션 스타일은 더 구체적으로 검증할 필요가 있습니다.",
+        },
+        {
+          id: "ai-3",
+          competency: "직무 전문성",
+          question:
+            "이 포지션에서 중요하다고 생각하는 업무 원칙을 실제 실무에서 적용했던 사례가 있다면 말씀해주세요.",
+          reason:
+            "실무 수행 경험은 보이나, 직무 기준을 어떻게 해석하고 적용하는지 확인하면 좋습니다.",
+        },
+      ];
 
       function getSelectedPosition() {
         return (
@@ -144,6 +181,7 @@
           finalDecision:
             window.INTERVIEW_DATA.finalOptions?.[0] || "추천",
           questionMemos: {},
+          aiQuestionMemos: {},
         };
       }
 
@@ -164,6 +202,18 @@
         const form = getFormState();
         const key = `${sectionId}__${questionIndex}`;
         form.questionMemos[key] = value;
+      }
+
+      function getAiQuestionMemo(sectionId, questionId) {
+        const form = getFormState();
+        const key = `${sectionId}__${questionId}`;
+        return form.aiQuestionMemos[key] || "";
+      }
+
+      function setAiQuestionMemo(sectionId, questionId, value) {
+        const form = getFormState();
+        const key = `${sectionId}__${questionId}`;
+        form.aiQuestionMemos[key] = value;
       }
 
       function updateFormField(field, value) {
@@ -190,6 +240,53 @@
         const key = `${selectedPositionId}__${sectionId}__${questionIndex}`;
         selectedScores[key] = score;
         render();
+      }
+
+      function getAppliedAiQuestions() {
+        return appliedAiQuestionsByPosition[selectedPositionId] || {};
+      }
+
+      function handleApplyAiQuestion(item) {
+        const competencies = getCompetencies();
+        const targetCompetency = competencies.find(
+          (section) => section.name === item.competency
+        );
+        if (!targetCompetency) return;
+
+        if (!appliedAiQuestionsByPosition[selectedPositionId]) {
+          appliedAiQuestionsByPosition[selectedPositionId] = {};
+        }
+
+        const current =
+          appliedAiQuestionsByPosition[selectedPositionId][targetCompetency.id] || [];
+
+        if (current.some((q) => q.id === item.id)) {
+          activeNav = targetCompetency.id;
+          render();
+          setTimeout(() => {
+            const el = document.getElementById(targetCompetency.id);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 50);
+          return;
+        }
+
+        appliedAiQuestionsByPosition[selectedPositionId][targetCompetency.id] = [
+          ...current,
+          {
+            id: item.id,
+            type: "AI 추천 질문",
+            main: item.question,
+            reason: item.reason,
+          },
+        ];
+
+        activeNav = targetCompetency.id;
+        render();
+
+        setTimeout(() => {
+          const el = document.getElementById(targetCompetency.id);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 50);
       }
 
       function setSelectedPosition(id) {
@@ -234,6 +331,16 @@
 
       function closeCautionModal() {
         showCautionModal = false;
+        render();
+      }
+
+      function toggleAiPanel() {
+        showAiPanel = true;
+        render();
+      }
+
+      function mockUploadResume() {
+        resumeUploaded = true;
         render();
       }
 
@@ -323,6 +430,7 @@
         const navItems = getNavItems();
         const form = getFormState();
         const currentFinalDecision = getFinalDecision();
+        const appliedAiQuestions = getAppliedAiQuestions();
 
         return `
           <div class="relative mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-14">
@@ -393,6 +501,75 @@
                 <p class="mt-3 text-sm leading-6 text-slate-500">${data.scoreGuide}</p>
               </div>
             </div>
+
+            <section class="mb-8 rounded-[30px] border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur md:p-6">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-blue-600">AI 질문 추천</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">이력서 기반 추가 확인 질문</h3>
+                  <p class="mt-2 text-sm leading-6 text-slate-600">
+                    현재 포지션의 역량과 질문 세트를 기준으로, 후보자 이력서에서 추가 검증이 필요한 포인트를 찾아 맞춤 질문 2~3개를 추천하는 기능 샘플입니다.
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    onclick="mockUploadResume()"
+                    class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm"
+                  >
+                    이력서 PDF 업로드
+                  </button>
+                  <button
+                    onclick="toggleAiPanel()"
+                    class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-4 py-2 text-sm font-medium text-white shadow-[0_10px_25px_rgba(59,130,246,0.22)]"
+                  >
+                    AI 질문 추천받기
+                  </button>
+                </div>
+              </div>
+
+              <div class="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span class="inline-flex h-2.5 w-2.5 rounded-full ${resumeUploaded ? "bg-emerald-500" : "bg-slate-300"}"></span>
+                <span class="font-medium text-slate-700">업로드 파일</span>
+                <span>candidate_resume.pdf</span>
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">PDF</span>
+              </div>
+
+              ${
+                showAiPanel
+                  ? `
+                <div class="mt-6 grid gap-4 lg:grid-cols-3">
+                  ${AI_RECOMMENDATIONS.map(
+                    (item) => `
+                    <div class="rounded-[26px] border border-slate-200 bg-slate-50/80 p-5 shadow-sm">
+                      <div class="mb-4 flex items-center justify-between gap-3">
+                        <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                          검증 역량 · ${item.competency}
+                        </span>
+                        <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
+                          AI 추천
+                        </span>
+                      </div>
+                      <p class="text-base font-semibold leading-7 text-slate-900">${escapeHtml(item.question)}</p>
+                      <div class="mt-4 rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 shadow-sm">
+                        <p class="font-semibold text-slate-900">추천 이유</p>
+                        <p class="mt-2">${escapeHtml(item.reason)}</p>
+                      </div>
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <button
+                          onclick="handleApplyAiQuestion('${item.id}')"
+                          class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm"
+                        >
+                          질문으로 활용
+                        </button>
+                      </div>
+                    </div>
+                  `
+                  ).join("")}
+                </div>
+              `
+                  : ""
+              }
+            </section>
 
             <div class="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
               <aside class="h-fit rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur xl:sticky xl:top-6">
@@ -467,7 +644,7 @@
                           <div class="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
                             <div>
                               <p class="text-sm font-semibold text-slate-500">${data.labels.mainQuestion}</p>
-                              <p class="mt-2 text-lg font-medium leading-8 text-slate-900">${q.main}</p>
+                              <p class="mt-2 text-lg font-medium leading-8 text-slate-900">${escapeHtml(q.main)}</p>
 
                               <div class="mt-5">
                                 <p class="text-sm font-semibold text-slate-500">${data.labels.followUp}</p>
@@ -475,7 +652,7 @@
                                   ${q.follow
                                     .map(
                                       (f) => `
-                                    <li class="rounded-2xl bg-white px-4 py-3 shadow-sm">${f}</li>
+                                    <li class="rounded-2xl bg-white px-4 py-3 shadow-sm">${escapeHtml(f)}</li>
                                   `
                                     )
                                     .join("")}
@@ -488,7 +665,7 @@
                                   ${q.points
                                     .map(
                                       (p) => `
-                                    <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">${p}</span>
+                                    <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">${escapeHtml(p)}</span>
                                   `
                                     )
                                     .join("")}
@@ -502,19 +679,19 @@
                                 <div class="mt-3 space-y-3 text-sm leading-6 text-slate-600">
                                   <div>
                                     <p class="font-semibold text-slate-700">${data.labels.purpose}</p>
-                                    <p>${q.rubric.purpose}</p>
+                                    <p>${escapeHtml(q.rubric.purpose)}</p>
                                   </div>
                                   <div>
                                     <p class="font-semibold text-slate-700">${data.labels.goodSignal}</p>
-                                    <p>${q.rubric.good}</p>
+                                    <p>${escapeHtml(q.rubric.good)}</p>
                                   </div>
                                   <div>
                                     <p class="font-semibold text-slate-700">${data.labels.averageAnswer}</p>
-                                    <p>${q.rubric.average}</p>
+                                    <p>${escapeHtml(q.rubric.average)}</p>
                                   </div>
                                   <div>
                                     <p class="font-semibold text-slate-700">${data.labels.riskSignal}</p>
-                                    <p>${q.rubric.weak}</p>
+                                    <p>${escapeHtml(q.rubric.weak)}</p>
                                   </div>
                                 </div>
                               </div>
@@ -533,6 +710,52 @@
                       `
                         )
                         .join("")}
+
+                      ${
+                        (appliedAiQuestions[section.id] || []).length > 0
+                          ? `
+                        <div class="rounded-[26px] border border-blue-200 bg-blue-50/60 p-5">
+                          <div class="mb-4 flex items-center justify-between gap-3">
+                            <div>
+                              <p class="text-sm font-medium text-blue-600">AI 추천 추가 질문</p>
+                              <p class="mt-1 text-base font-semibold text-slate-900">이 역량에 추가로 활용할 질문</p>
+                            </div>
+                            <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
+                              ${(appliedAiQuestions[section.id] || []).length}개 추가됨
+                            </span>
+                          </div>
+
+                          <div class="space-y-4">
+                            ${(appliedAiQuestions[section.id] || [])
+                              .map(
+                                (item) => `
+                              <div class="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+                                <div class="mb-3 flex items-center justify-between gap-3">
+                                  <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">${escapeHtml(item.type)}</span>
+                                  <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">추가 질문</span>
+                                </div>
+                                <p class="text-base font-semibold leading-7 text-slate-900">${escapeHtml(item.main)}</p>
+                                <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                                  <p class="font-semibold text-slate-900">추천 이유</p>
+                                  <p class="mt-2">${escapeHtml(item.reason)}</p>
+                                </div>
+                                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                                  <p class="text-sm font-semibold text-slate-900">${data.labels.memo}</p>
+                                  <textarea
+                                    class="mt-3 h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                                    placeholder="${data.labels.memoPlaceholder}"
+                                    oninput="setAiQuestionMemo('${section.id}', '${item.id}', this.value)"
+                                  >${escapeHtml(getAiQuestionMemo(section.id, item.id))}</textarea>
+                                </div>
+                              </div>
+                            `
+                              )
+                              .join("")}
+                          </div>
+                        </div>
+                      `
+                          : ""
+                      }
                     </div>
                   </section>
                 `
@@ -615,128 +838,114 @@
         `;
       }
 
-     function renderCautionModal() {
-  if (!showCautionModal) return "";
+      function renderCautionModal() {
+        if (!showCautionModal) return "";
 
-  const todoItems = [
-    {
-      text: "우리 회사에 호감을 가질 수 있도록 후보자를 배려하기",
-      sub: "(예: 면접 참석에 대한 감사인사, 밝은 표정, 물 권하기 등)",
-    },
-    {
-      text: "무엇을 평가할 것인지, JD 및 평가항목/기준을 사전에 명확히 이해하기",
-    },
-    {
-      text: "면접에 활용할 질문들을 사전에 준비하기",
-    },
-    {
-      text: "모든 후보자를 공정하고 편견 없이 대하기",
-    },
-    {
-      text: "후보자가 말을 할 때는 눈을 맞추고 주의를 집중하기",
-    },
-    {
-      text: "감각이나 느낌, 추측이 아닌 관찰한 행동과 답변 내용에 초점을 맞추기",
-    },
-    {
-      text: "중요한 답변, 특이사항 등 평가의 근거가 되는 것들은 즉시 메모하기",
-    },
-  ];
+        const todoItems = [
+          {
+            text: "우리 회사에 호감을 가질 수 있도록 후보자를 배려하기",
+            sub: "(예: 면접 참석에 대한 감사인사, 밝은 표정, 물 권하기 등)",
+          },
+          {
+            text: "무엇을 평가할 것인지, JD 및 평가항목/기준을 사전에 명확히 이해하기",
+          },
+          {
+            text: "면접에 활용할 질문들을 사전에 준비하기",
+          },
+          {
+            text: "모든 후보자를 공정하고 편견 없이 대하기",
+          },
+          {
+            text: "후보자가 말을 할 때는 눈을 맞추고 주의를 집중하기",
+          },
+          {
+            text: "감각이나 느낌, 추측이 아닌 관찰한 행동과 답변 내용에 초점을 맞추기",
+          },
+          {
+            text: "중요한 답변, 특이사항 등 평가의 근거가 되는 것들은 즉시 메모하기",
+          },
+        ];
 
-  const notTodoItems = [
-    {
-      text: "면접시간에 지각",
-    },
-    {
-      text: "후보자를 존중하지 않거나 무시하는 태도나 말투",
-    },
-    {
-      text: "차별적인 발언 (예: 성별, 출신, 스펙, 외모 등)",
-    },
-    {
-      text: "합/불 여부를 표정, 자세로 드러내기",
-    },
-    {
-      text: "특정인 또는 특정 집단을 혐오/비하하는 발언",
-    },
-    {
-      text: "후보자의 사생활에 대한 질문",
-      sub: "(예: 가족관계, 부모님 직업, 이성관계 등)",
-    },
-    {
-      text: "답변하기 어려운 난해한 질문",
-    },
-    {
-      text: "필요하게 후보자의 말꼬리 붙잡기",
-    },
-  ];
+        const notTodoItems = [
+          { text: "면접시간에 지각" },
+          { text: "후보자를 존중하지 않거나 무시하는 태도나 말투" },
+          { text: "차별적인 발언 (예: 성별, 출신, 스펙, 외모 등)" },
+          { text: "합/불 여부를 표정, 자세로 드러내기" },
+          { text: "특정인 또는 특정 집단을 혐오/비하하는 발언" },
+          {
+            text: "후보자의 사생활에 대한 질문",
+            sub: "(예: 가족관계, 부모님 직업, 이성관계 등)",
+          },
+          { text: "답변하기 어려운 난해한 질문" },
+          { text: "필요하게 후보자의 말꼬리 붙잡기" },
+        ];
 
-  const renderList = (items) =>
-    items
-      .map(
-        (item) => `
-          <li class="flex gap-3">
-            <span class="mt-[2px] w-4 shrink-0 text-center text-slate-800">·</span>
-            <div class="min-w-0 flex-1">
-              <p class="text-[17px] leading-8 text-slate-800 break-keep">${item.text}</p>
-              ${
-                item.sub
-                  ? `<p class="mt-1 text-[15px] leading-7 text-slate-500 break-keep">${item.sub}</p>`
-                  : ""
-              }
-            </div>
-          </li>
-        `
-      )
-      .join("");
+        const renderList = (items) =>
+          items
+            .map(
+              (item) => `
+                <li class="flex gap-3">
+                  <span class="mt-[2px] w-4 shrink-0 text-center text-slate-800">·</span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[17px] leading-8 text-slate-800 break-keep">${item.text}</p>
+                    ${
+                      item.sub
+                        ? `<p class="mt-1 text-[15px] leading-7 text-slate-500 break-keep">${item.sub}</p>`
+                        : ""
+                    }
+                  </div>
+                </li>
+              `
+            )
+            .join("");
 
-  return `
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
-      <div class="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
-        <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
-            <p class="text-sm font-medium text-blue-600">면접 유의사항</p>
-            <h3 class="mt-1 text-2xl font-semibold text-slate-900">면접관 TO DO & NOT TO DO</h3>
-          </div>
-          <button
-            onclick="closeCautionModal()"
-            class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
-          >
-            닫기
-          </button>
-        </div>
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+            <div class="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
+              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <p class="text-sm font-medium text-blue-600">면접 유의사항</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">면접관 TO DO & NOT TO DO</h3>
+                </div>
+                <button
+                  onclick="closeCautionModal()"
+                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  닫기
+                </button>
+              </div>
 
-        <div class="rounded-[28px] bg-slate-50 p-6 md:p-8">
-          <div class="text-[15px] leading-7 text-slate-700 break-keep">
-            <p>후보자에게 긍정적인 면접 경험을 제공하는 데 가장 중요한 것은 면접관의 태도입니다.</p>
-            <p>면접관에게는 여러 면접 중 하나이지만, <span class="font-semibold">후보자에게는 우리 회사에서 경험할 첫 면접이자 유일한 면접</span>일 수 있습니다.</p>
-            <p>후보자들이 회사에 대해 긍정적인 첫인상을 가지기 위해서는 <span class="font-semibold">면접관의 역할이 매우 중요합니다.</span></p>
-          </div>
+              <div class="rounded-[28px] bg-slate-50 p-6 md:p-8">
+                <div class="text-[15px] leading-7 text-slate-700 break-keep">
+                  <p>후보자에게 긍정적인 면접 경험을 제공하는 데 가장 중요한 것은 면접관의 태도입니다.</p>
+                  <p>면접관에게는 여러 면접 중 하나이지만, <span class="font-semibold">후보자에게는 우리 회사에서 경험할 첫 면접이자 유일한 면접</span>일 수 있습니다.</p>
+                  <p>후보자들이 회사에 대해 긍정적인 첫인상을 가지기 위해서는 <span class="font-semibold">면접관의 역할이 매우 중요합니다.</span></p>
+                </div>
 
-          <div class="mt-6 text-3xl font-bold text-slate-900">
-            ■ 면접관 <span class="text-red-600">TO</span> DO & <span class="text-red-600">NOT TO</span> DO
-          </div>
+                <div class="mt-6 text-3xl font-bold text-slate-900">
+                  ■ 면접관 <span class="text-red-600">TO</span> DO & <span class="text-red-600">NOT TO</span> DO
+                </div>
 
-          <div class="mt-8 grid gap-6 md:grid-cols-2">
-            <div class="rounded-3xl border border-slate-200 bg-white p-6">
-              <h4 class="mb-5 text-center text-4xl font-bold text-red-600">TO DO</h4>
-              <ul class="space-y-4">
-                ${renderList(todoItems)}
-              </ul>
-            </div>
+                <div class="mt-8 grid gap-6 md:grid-cols-2">
+                  <div class="rounded-3xl border border-slate-200 bg-white p-6">
+                    <h4 class="mb-5 text-center text-4xl font-bold text-red-600">TO DO</h4>
+                    <ul class="space-y-4">
+                      ${renderList(todoItems)}
+                    </ul>
+                  </div>
 
-            <div class="rounded-3xl border border-slate-200 bg-white p-6">
-              <h4 class="mb-5 text-center text-4xl font-bold text-red-600">NOT TO DO</h4>
-              <ul class="space-y-4">
-                ${renderList(notTodoItems)}
-              </ul>
+                  <div class="rounded-3xl border border-slate-200 bg-white p-6">
+                    <h4 class="mb-5 text-center text-4xl font-bold text-red-600">NOT TO DO</h4>
+                    <ul class="space-y-4">
+                      ${renderList(notTodoItems)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
+        `;
+      }
 
       function renderPdfPreview() {
         if (!showPdfPreview) return "";
@@ -746,6 +955,7 @@
         const competencies = getCompetencies();
         const form = getFormState();
         const currentFinalDecision = getFinalDecision();
+        const appliedAiQuestions = getAppliedAiQuestions();
 
         return `
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
@@ -825,6 +1035,28 @@
                           `;
                         })
                         .join("")}
+
+                      ${
+                        (appliedAiQuestions[item.id] || []).length > 0
+                          ? `
+                        ${(appliedAiQuestions[item.id] || [])
+                          .map((aiItem) => {
+                            const aiMemo = getAiQuestionMemo(item.id, aiItem.id);
+                            return `
+                              <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                                <p class="text-sm font-semibold text-blue-700">AI 추천 질문</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-800">${escapeHtml(aiItem.main)}</p>
+                                <div class="mt-3">
+                                  <p class="text-sm font-semibold text-slate-900">${data.labels.memoSummary}</p>
+                                  <p class="mt-2 text-sm leading-6 text-slate-700">${aiMemo ? nl2br(aiMemo) : "작성된 메모 없음"}</p>
+                                </div>
+                              </div>
+                            `;
+                          })
+                          .join("")}
+                      `
+                          : ""
+                      }
                     </div>
                   `
                     )
@@ -895,6 +1127,12 @@
         html2pdf().set(opt).from(element).save();
       }
 
+      function handleApplyAiQuestionById(id) {
+        const item = AI_RECOMMENDATIONS.find((q) => q.id === id);
+        if (!item) return;
+        handleApplyAiQuestion(item);
+      }
+
       function render() {
         app.innerHTML = `
           ${currentPage === "landing" ? renderLanding() : renderGuide()}
@@ -911,11 +1149,15 @@
       window.closePdfPreview = closePdfPreview;
       window.openCautionModal = openCautionModal;
       window.closeCautionModal = closeCautionModal;
+      window.toggleAiPanel = toggleAiPanel;
+      window.mockUploadResume = mockUploadResume;
       window.setQuestionScore = setQuestionScore;
       window.setQuestionMemo = setQuestionMemo;
+      window.setAiQuestionMemo = setAiQuestionMemo;
       window.updateFormField = updateFormField;
       window.setFinalDecision = setFinalDecision;
       window.downloadPdf = downloadPdf;
+      window.handleApplyAiQuestion = handleApplyAiQuestionById;
 
       render();
     </script>
