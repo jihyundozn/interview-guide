@@ -542,8 +542,8 @@ window.INTERVIEW_DATA = {
           },
         ],
       },
-    },
-  ],
+    }
+    ],
       pdfPreview: {
         candidateName: "홍길동",
         interviewers: "오지현",
