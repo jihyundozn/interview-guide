@@ -516,7 +516,7 @@ window.INTERVIEW_DATA = {
                 "모르는 것은 그냥 기다리거나, 익숙하지 않은 상황에서 수동적으로 멈추는 태도가 드러납니다.",
             },
           },
-          {
+        {
             type: "상황 가정형",
             main:
               "처음 맡은 반복 업무인데 기준이 명확히 정리되어 있지 않다면, 어떻게 업무를 익히고 정리해가시겠습니까?",
@@ -542,16 +542,15 @@ window.INTERVIEW_DATA = {
           },
         ],
       },
-    }
     ],
-      pdfPreview: {
-        candidateName: "홍길동",
-        interviewers: "오지현",
-        interviewDate: "2026.04.01",
-        overallComment: "서비스기획 포지션용 샘플 종합 의견입니다.",
-        followUps: ["핵심 프로젝트 범위", "협업 구조", "의사결정 기준"],
-        finalDecision: "보류",
-      },
+    pdfPreview: {
+      candidateName: "홍길동",
+      interviewers: "오지현",
+      interviewDate: "2026.04.01",
+      overallComment: "서비스기획 포지션용 샘플 종합 의견입니다.",
+      followUps: ["핵심 프로젝트 범위", "협업 구조", "의사결정 기준"],
+      finalDecision: "보류",
     },
-  ],
+  },
+],
 };
