@@ -450,6 +450,9 @@
                               <p class="text-sm font-semibold text-slate-500">${data.labels.mainQuestion}</p>
                               <p class="mt-2 text-lg font-medium leading-8 text-slate-900">${q.main}</p>
 
+                              ${
+                                q.follow && q.follow.length
+                                  ? `
                               <div class="mt-5">
                                 <p class="text-sm font-semibold text-slate-500">${data.labels.followUp}</p>
                                 <ul class="mt-2 space-y-2 text-sm leading-7 text-slate-700">
@@ -462,6 +465,31 @@
                                     .join("")}
                                 </ul>
                               </div>
+                              `
+                                  : ""
+                              }
+
+                              ${
+                                q.juniorPrompt
+                                  ? `
+                              <div class="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                                <p class="text-sm font-semibold text-emerald-900">${data.labels.juniorPrompt}</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-700">${q.juniorPrompt}</p>
+                              </div>
+                              `
+                                  : ""
+                              }
+
+                              ${
+                                q.noExperiencePrompt
+                                  ? `
+                              <div class="mt-4 rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+                                <p class="text-sm font-semibold text-violet-900">${data.labels.noExperiencePrompt}</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-700">${q.noExperiencePrompt}</p>
+                              </div>
+                              `
+                                  : ""
+                              }
 
                               <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
                                 <p class="text-sm font-semibold text-slate-900">질문의도·확인포인트</p>
