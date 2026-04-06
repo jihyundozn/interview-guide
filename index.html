@@ -104,6 +104,7 @@
       let showPdfPreview = false;
       let showCautionModal = false;
       let showDraftModal = false;
+      let isProgrammaticScroll = false;
 
       let selectedScores = {};
       let formStateByPosition = {};
@@ -263,8 +264,44 @@
         render();
       }
 
+      function getCurrentVisibleSectionId() {
+        const navItems = getNavItems();
+        const sectionIds = navItems.map((item) => item.id);
+
+        const sections = sectionIds
+          .map((id) => document.getElementById(id))
+          .filter(Boolean);
+
+        if (!sections.length) return activeNav;
+
+        const viewportOffset = 140;
+        let currentId = sectionIds[0];
+
+        for (const section of sections) {
+          const rect = section.getBoundingClientRect();
+          if (rect.top - viewportOffset <= 0) {
+            currentId = section.id;
+          }
+        }
+
+        return currentId;
+      }
+
+      function handleScrollSpy() {
+        if (currentPage !== "guide") return;
+        if (showPdfPreview || showCautionModal || showDraftModal) return;
+        if (isProgrammaticScroll) return;
+
+        const currentId = getCurrentVisibleSectionId();
+        if (currentId && currentId !== activeNav) {
+          activeNav = currentId;
+          render();
+        }
+      }
+
       function scrollToSection(id) {
         activeNav = id;
+        isProgrammaticScroll = true;
         render();
 
         setTimeout(() => {
@@ -272,6 +309,15 @@
           if (el) {
             el.scrollIntoView({ behavior: "smooth", block: "start" });
           }
+
+          setTimeout(() => {
+            isProgrammaticScroll = false;
+            const currentId = getCurrentVisibleSectionId();
+            if (currentId && currentId !== activeNav) {
+              activeNav = currentId;
+              render();
+            }
+          }, 500);
         }, 10);
       }
 
@@ -1202,6 +1248,18 @@
       window.resetCurrentEvaluation = resetCurrentEvaluation;
 
       render();
+
+      let scrollSpyTicking = false;
+
+      window.addEventListener("scroll", () => {
+        if (scrollSpyTicking) return;
+
+        scrollSpyTicking = true;
+        requestAnimationFrame(() => {
+          handleScrollSpy();
+          scrollSpyTicking = false;
+        });
+      });
     </script>
   </body>
 </html>
