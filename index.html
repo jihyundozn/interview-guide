@@ -192,6 +192,18 @@
         render();
       }
 
+      function getSectionScore(sectionId, questions) {
+        const scores = questions
+          .map((_, qIndex) => getQuestionScore(sectionId, qIndex))
+          .filter((score) => score !== null && score !== undefined);
+
+        if (!scores.length) return null;
+        if (scores.length === 1) return scores[0];
+
+        const avg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        return Number(avg.toFixed(1));
+      }
+
       function setSelectedPosition(id) {
         selectedPositionId = id;
         const selected = getSelectedPosition();
@@ -829,8 +841,9 @@
 
                 <div class="mt-6 space-y-5">
                   ${competencies
-                    .map(
-                      (item) => `
+                    .map((item) => {
+                      const sectionScore = getSectionScore(item.id, item.questions);
+                      return `
                     <div class="pdf-break-avoid rounded-3xl border border-slate-200 p-5">
                       <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
@@ -838,7 +851,7 @@
                           <p class="text-xl font-semibold text-slate-900">${item.name}</p>
                         </div>
                         <div class="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
-                          ${getQuestionScore(item.id, 0) || "-"} / 5점
+                          ${sectionScore !== null ? sectionScore : "-"} / 5점
                         </div>
                       </div>
 
@@ -862,8 +875,8 @@
                         })
                         .join("")}
                     </div>
-                  `
-                    )
+                  `;
+                    })
                     .join("")}
                 </div>
 
