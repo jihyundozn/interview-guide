@@ -105,6 +105,7 @@
       let showCautionModal = false;
       let showDraftModal = false;
       let isProgrammaticScroll = false;
+      let showScrollTopButton = false;
 
       let selectedScores = {};
       let formStateByPosition = {};
@@ -222,7 +223,8 @@
         render();
 
         setTimeout(() => {
-          scrollToSection(activeNav);
+          window.scrollTo({ top: 0, behavior: "auto" });
+          handleScrollSpy();
         }, 50);
       }
 
@@ -231,6 +233,7 @@
         showPdfPreview = false;
         showCautionModal = false;
         showDraftModal = false;
+        showScrollTopButton = false;
         render();
       }
 
@@ -321,6 +324,21 @@
         }, 10);
       }
 
+      function scrollToTop() {
+        isProgrammaticScroll = true;
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+
+        setTimeout(() => {
+          isProgrammaticScroll = false;
+          activeNav = getNavItems()[0]?.id || "final-review";
+          render();
+        }, 500);
+      }
+
       function escapeHtml(value) {
         return String(value || "")
           .replace(/&/g, "&amp;")
@@ -390,7 +408,7 @@
         drafts.unshift(draft);
         setDrafts(drafts);
 
-        alert("저장되었습니다.");
+        alert("임시저장되었습니다.");
       }
 
       function loadDraft(draftId) {
@@ -423,7 +441,8 @@
         render();
 
         setTimeout(() => {
-          scrollToSection("final-review");
+          window.scrollTo({ top: 0, behavior: "auto" });
+          handleScrollSpy();
         }, 50);
       }
 
@@ -782,7 +801,7 @@
                         onclick="saveDraft()"
                         class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm"
                       >
-                        저장
+                        임시저장
                       </button>
                       <button
                         onclick="openDraftModal()"
@@ -1131,7 +1150,7 @@
               <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
                   <p class="text-sm font-medium text-blue-600">저장 기록</p>
-                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">저장된 평가 불러오기</h3>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">임시저장된 평가 불러오기</h3>
                 </div>
                 <button
                   onclick="closeDraftModal()"
@@ -1194,6 +1213,29 @@
         `;
       }
 
+      function renderScrollTopButton() {
+        if (
+          currentPage !== "guide" ||
+          !showScrollTopButton ||
+          showPdfPreview ||
+          showCautionModal ||
+          showDraftModal
+        ) {
+          return "";
+        }
+
+        return `
+          <button
+            onclick="scrollToTop()"
+            class="fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-xl font-bold text-slate-700 shadow-[0_10px_25px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:bg-slate-50"
+            aria-label="맨 위로 이동"
+            title="맨 위로 이동"
+          >
+            ↑
+          </button>
+        `;
+      }
+
       function downloadPdf() {
         const selected = getSelectedPosition();
         const form = getFormState();
@@ -1230,6 +1272,7 @@
           ${renderCautionModal()}
           ${renderPdfPreview()}
           ${renderDraftModal()}
+          ${renderScrollTopButton()}
         `;
       }
 
@@ -1237,6 +1280,7 @@
       window.startGuide = startGuide;
       window.goLanding = goLanding;
       window.scrollToSection = scrollToSection;
+      window.scrollToTop = scrollToTop;
       window.openPdfPreview = openPdfPreview;
       window.closePdfPreview = closePdfPreview;
       window.openCautionModal = openCautionModal;
@@ -1263,6 +1307,19 @@
         scrollSpyTicking = true;
         requestAnimationFrame(() => {
           handleScrollSpy();
+
+          const shouldShow =
+            currentPage === "guide" &&
+            window.scrollY > 900 &&
+            !showPdfPreview &&
+            !showCautionModal &&
+            !showDraftModal;
+
+          if (shouldShow !== showScrollTopButton) {
+            showScrollTopButton = shouldShow;
+            render();
+          }
+
           scrollSpyTicking = false;
         });
       });
