@@ -103,9 +103,12 @@
         window.INTERVIEW_DATA.positions[0]?.competencies?.[0]?.id || "final-review";
       let showPdfPreview = false;
       let showCautionModal = false;
+      let showDraftModal = false;
 
       let selectedScores = {};
       let formStateByPosition = {};
+
+      const DRAFT_STORAGE_KEY = "dozn_interview_guide_drafts_v1";
 
       function getSelectedPosition() {
         return (
@@ -226,6 +229,7 @@
         currentPage = "landing";
         showPdfPreview = false;
         showCautionModal = false;
+        showDraftModal = false;
         render();
       }
 
@@ -246,6 +250,16 @@
 
       function closeCautionModal() {
         showCautionModal = false;
+        render();
+      }
+
+      function openDraftModal() {
+        showDraftModal = true;
+        render();
+      }
+
+      function closeDraftModal() {
+        showDraftModal = false;
         render();
       }
 
@@ -272,6 +286,123 @@
 
       function nl2br(value) {
         return escapeHtml(value).replace(/\n/g, "<br>");
+      }
+
+      function getDrafts() {
+        try {
+          return JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY)) || [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function setDrafts(drafts) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+      }
+
+      function formatDraftDate(date = new Date()) {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        const hh = String(date.getHours()).padStart(2, "0");
+        const mi = String(date.getMinutes()).padStart(2, "0");
+        return `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
+      }
+
+      function getCurrentPositionScores(positionId) {
+        const prefix = `${positionId}__`;
+        return Object.fromEntries(
+          Object.entries(selectedScores).filter(([key]) => key.startsWith(prefix))
+        );
+      }
+
+      function saveDraft() {
+        const selected = getSelectedPosition();
+        const form = getFormState();
+
+        if (!form.candidateName.trim()) {
+          alert("후보자명을 입력한 뒤 저장해주세요.");
+          return;
+        }
+
+        const drafts = getDrafts();
+
+        const draft = {
+          id: `draft_${Date.now()}`,
+          savedAt: formatDraftDate(),
+          positionId: selectedPositionId,
+          positionName: selected.name,
+          candidateName: form.candidateName.trim(),
+          interviewer: form.interviewer || "",
+          interviewDate: form.interviewDate || "",
+          formState: JSON.parse(JSON.stringify(form)),
+          selectedScores: JSON.parse(
+            JSON.stringify(getCurrentPositionScores(selectedPositionId))
+          ),
+        };
+
+        drafts.unshift(draft);
+        setDrafts(drafts);
+
+        alert("임시저장되었습니다.");
+      }
+
+      function loadDraft(draftId) {
+        const drafts = getDrafts();
+        const draft = drafts.find((item) => item.id === draftId);
+
+        if (!draft) {
+          alert("저장된 데이터를 찾을 수 없습니다.");
+          return;
+        }
+
+        selectedPositionId = draft.positionId;
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+
+        formStateByPosition[draft.positionId] = JSON.parse(
+          JSON.stringify(draft.formState || getDefaultFormState())
+        );
+
+        Object.keys(selectedScores).forEach((key) => {
+          if (key.startsWith(`${draft.positionId}__`)) {
+            delete selectedScores[key];
+          }
+        });
+
+        Object.assign(selectedScores, draft.selectedScores || {});
+
+        currentPage = "guide";
+        showDraftModal = false;
+        render();
+
+        setTimeout(() => {
+          scrollToSection("final-review");
+        }, 50);
+      }
+
+      function deleteDraft(draftId) {
+        const ok = confirm("이 저장 기록을 삭제할까요?");
+        if (!ok) return;
+
+        const drafts = getDrafts().filter((item) => item.id !== draftId);
+        setDrafts(drafts);
+        render();
+      }
+
+      function resetCurrentEvaluation() {
+        const ok = confirm("현재 선택한 포지션의 작성 내용을 초기화할까요?");
+        if (!ok) return;
+
+        formStateByPosition[selectedPositionId] = getDefaultFormState();
+
+        Object.keys(selectedScores).forEach((key) => {
+          if (key.startsWith(`${selectedPositionId}__`)) {
+            delete selectedScores[key];
+          }
+        });
+
+        render();
       }
 
       function renderLanding() {
@@ -588,17 +719,38 @@
                   .join("")}
 
                 <section id="final-review" class="rounded-[30px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
-                  <div class="mb-5 flex items-center justify-between gap-3">
+                  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p class="text-sm font-medium text-blue-600">${data.labels.finalReview}</p>
                       <h3 class="mt-1 text-2xl font-semibold text-slate-900">${data.labels.finalReview}</h3>
                     </div>
-                    <button
-                      onclick="openPdfPreview()"
-                      class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
-                    >
-                      ${data.labels.savePdf}
-                    </button>
+
+                    <div class="flex flex-wrap gap-2">
+                      <button
+                        onclick="saveDraft()"
+                        class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm"
+                      >
+                        임시저장
+                      </button>
+                      <button
+                        onclick="openDraftModal()"
+                        class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+                      >
+                        저장기록 보기
+                      </button>
+                      <button
+                        onclick="resetCurrentEvaluation()"
+                        class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-sm"
+                      >
+                        입력 초기화
+                      </button>
+                      <button
+                        onclick="openPdfPreview()"
+                        class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
+                      >
+                        ${data.labels.savePdf}
+                      </button>
+                    </div>
                   </div>
 
                   <div class="grid gap-4 md:grid-cols-3">
@@ -913,6 +1065,83 @@
         `;
       }
 
+      function renderDraftModal() {
+        if (!showDraftModal) return "";
+
+        const drafts = getDrafts();
+        const selectedDrafts = drafts.filter(
+          (item) => item.positionId === selectedPositionId
+        );
+
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+            <div class="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[32px] bg-white p-5 shadow-2xl md:p-8">
+              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <p class="text-sm font-medium text-blue-600">저장 기록</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">임시저장된 평가 불러오기</h3>
+                </div>
+                <button
+                  onclick="closeDraftModal()"
+                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  닫기
+                </button>
+              </div>
+
+              ${
+                !selectedDrafts.length
+                  ? `
+                <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
+                  현재 포지션에 저장된 평가 기록이 없습니다.
+                </div>
+              `
+                  : `
+                <div class="space-y-3">
+                  ${selectedDrafts
+                    .map(
+                      (draft) => `
+                    <div class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p class="text-lg font-semibold text-slate-900">${escapeHtml(
+                            draft.candidateName || "-"
+                          )}</p>
+                          <div class="mt-2 space-y-1 text-sm text-slate-500">
+                            <p>포지션: ${escapeHtml(draft.positionName || "-")}</p>
+                            <p>면접관: ${escapeHtml(draft.interviewer || "-")}</p>
+                            <p>면접일: ${escapeHtml(draft.interviewDate || "-")}</p>
+                            <p>저장시각: ${escapeHtml(draft.savedAt || "-")}</p>
+                          </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                          <button
+                            onclick="loadDraft('${draft.id}')"
+                            class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-4 py-2 text-sm font-semibold text-white"
+                          >
+                            불러오기
+                          </button>
+                          <button
+                            onclick="deleteDraft('${draft.id}')"
+                            class="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  `
+                    )
+                    .join("")}
+                </div>
+              `
+              }
+            </div>
+          </div>
+        `;
+      }
+
       function downloadPdf() {
         const selected = getSelectedPosition();
         const form = getFormState();
@@ -948,6 +1177,7 @@
           ${currentPage === "landing" ? renderLanding() : renderGuide()}
           ${renderCautionModal()}
           ${renderPdfPreview()}
+          ${renderDraftModal()}
         `;
       }
 
@@ -959,11 +1189,17 @@
       window.closePdfPreview = closePdfPreview;
       window.openCautionModal = openCautionModal;
       window.closeCautionModal = closeCautionModal;
+      window.openDraftModal = openDraftModal;
+      window.closeDraftModal = closeDraftModal;
       window.setQuestionScore = setQuestionScore;
       window.setQuestionMemo = setQuestionMemo;
       window.updateFormField = updateFormField;
       window.setFinalDecision = setFinalDecision;
       window.downloadPdf = downloadPdf;
+      window.saveDraft = saveDraft;
+      window.loadDraft = loadDraft;
+      window.deleteDraft = deleteDraft;
+      window.resetCurrentEvaluation = resetCurrentEvaluation;
 
       render();
     </script>
