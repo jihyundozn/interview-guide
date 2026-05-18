@@ -104,6 +104,7 @@
       let showPdfPreview = false;
       let showCautionModal = false;
       let showDraftModal = false;
+      let showCustomQuestionModal = false;
       let isProgrammaticScroll = false;
       let showScrollTopButton = false;
 
@@ -111,6 +112,16 @@
       let formStateByPosition = {};
 
       const DRAFT_STORAGE_KEY = "dozn_interview_guide_drafts_v1";
+      const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v1";
+      const CUSTOM_SECTION_ID = "custom-job-questions";
+      const CUSTOM_SECTION_NAME = "직무 추가 질문";
+      const CUSTOM_QUESTION_TYPES = ["기술·지식 기반", "과거 경험 기반", "상황 가정형", "직무 가치관"];
+
+      let customQuestionForm = {
+        type: "과거 경험 기반",
+        main: "",
+        follow: "",
+      };
 
       function getSelectedPosition() {
         return (
@@ -125,12 +136,19 @@
       }
 
       function getNavItems() {
+        const customCount = getCurrentCustomQuestions().length;
+
         return [
           ...getCompetencies().map((item) => ({
             id: item.id,
             name: item.name,
             order: item.order,
           })),
+          {
+            id: CUSTOM_SECTION_ID,
+            name: CUSTOM_SECTION_NAME,
+            order: `면접관 직접 등록 · ${customCount}개`,
+          },
           {
             id: "final-review",
             name: "최종평가",
@@ -233,6 +251,7 @@
         showPdfPreview = false;
         showCautionModal = false;
         showDraftModal = false;
+        showCustomQuestionModal = false;
         showScrollTopButton = false;
         render();
       }
@@ -267,6 +286,131 @@
         render();
       }
 
+      function openCustomQuestionModal() {
+        customQuestionForm = {
+          type: "과거 경험 기반",
+          main: "",
+          follow: "",
+        };
+        showCustomQuestionModal = true;
+        render();
+      }
+
+      function closeCustomQuestionModal() {
+        showCustomQuestionModal = false;
+        render();
+      }
+
+      function updateCustomQuestionForm(field, value) {
+        customQuestionForm[field] = value;
+      }
+
+      function getAllCustomQuestions() {
+        try {
+          return JSON.parse(localStorage.getItem(CUSTOM_QUESTION_STORAGE_KEY)) || {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function setAllCustomQuestions(data) {
+        localStorage.setItem(CUSTOM_QUESTION_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function getCustomQuestionPoints(type) {
+        const pointsByType = {
+          "기술·지식 기반": ["핵심 개념 이해도", "실무 적용 경험", "업무 기준 보유 여부"],
+          "과거 경험 기반": ["본인 역할의 명확성", "실제 수행 경험", "결과와 학습"],
+          "상황 가정형": ["상황 판단 기준", "대응 순서", "리스크 인식"],
+          "직무 가치관": ["직무 이해도", "업무에서 중요하게 보는 기준", "성장 방향성"],
+        };
+
+        return pointsByType[type] || ["직무 경험", "판단 기준", "업무 적용"];
+      }
+
+      function getCustomQuestionRubric() {
+        return {
+          purpose: "직무 수행에 필요한 경험, 판단 기준, 실무 적용 방식을 확인합니다.",
+          good: "직무 경험, 본인 역할, 판단 기준, 결과가 구체적으로 설명됩니다.",
+          average: "경험은 있으나 본인 역할이나 판단 기준 설명이 다소 일반적입니다.",
+          weak: "추상적인 답변에 머물거나 실제 직무 경험과 연결되지 않습니다.",
+        };
+      }
+
+      function normalizeCustomQuestion(question) {
+        const type = question.type || "과거 경험 기반";
+
+        return {
+          id: question.id || `custom_${Date.now()}`,
+          type,
+          main: question.main || "",
+          follow: Array.isArray(question.follow)
+            ? question.follow
+            : question.follow
+              ? [question.follow]
+              : [],
+          points: question.points?.length ? question.points : getCustomQuestionPoints(type),
+          rubric: question.rubric || getCustomQuestionRubric(),
+        };
+      }
+
+      function getCurrentCustomQuestions() {
+        const allCustomQuestions = getAllCustomQuestions();
+        return (allCustomQuestions[selectedPositionId] || []).map(normalizeCustomQuestion);
+      }
+
+      function setCurrentCustomQuestions(questions) {
+        const allCustomQuestions = getAllCustomQuestions();
+        allCustomQuestions[selectedPositionId] = questions.map(normalizeCustomQuestion);
+        setAllCustomQuestions(allCustomQuestions);
+      }
+
+      function saveCustomQuestion() {
+        const main = customQuestionForm.main.trim();
+
+        if (!main) {
+          alert("메인 질문을 입력해주세요.");
+          return;
+        }
+
+        const type = customQuestionForm.type || "과거 경험 기반";
+        const newQuestion = normalizeCustomQuestion({
+          id: `custom_${Date.now()}`,
+          type,
+          main,
+          follow: customQuestionForm.follow.trim()
+            ? [customQuestionForm.follow.trim()]
+            : [],
+          points: getCustomQuestionPoints(type),
+          rubric: getCustomQuestionRubric(),
+        });
+
+        const questions = getCurrentCustomQuestions();
+        questions.push(newQuestion);
+        setCurrentCustomQuestions(questions);
+
+        showCustomQuestionModal = false;
+        activeNav = CUSTOM_SECTION_ID;
+        render();
+
+        setTimeout(() => {
+          const el = document.getElementById(CUSTOM_SECTION_ID);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 50);
+      }
+
+      function deleteCustomQuestion(questionId) {
+        const ok = confirm("이 직무 질문을 삭제할까요?");
+        if (!ok) return;
+
+        const questions = getCurrentCustomQuestions().filter(
+          (question) => question.id !== questionId
+        );
+        setCurrentCustomQuestions(questions);
+        render();
+      }
+
+
       function getCurrentVisibleSectionId() {
         const navItems = getNavItems();
         const sectionIds = navItems.map((item) => item.id);
@@ -292,7 +436,7 @@
 
       function handleScrollSpy() {
         if (currentPage !== "guide") return;
-        if (showPdfPreview || showCautionModal || showDraftModal) return;
+        if (showPdfPreview || showCautionModal || showDraftModal || showCustomQuestionModal) return;
         if (isProgrammaticScroll) return;
 
         const currentId = getCurrentVisibleSectionId();
@@ -400,6 +544,7 @@
           interviewer: form.interviewer || "",
           interviewDate: form.interviewDate || "",
           formState: JSON.parse(JSON.stringify(form)),
+          customQuestions: JSON.parse(JSON.stringify(getCurrentCustomQuestions())),
           selectedScores: JSON.parse(
             JSON.stringify(getCurrentPositionScores(selectedPositionId))
           ),
@@ -427,6 +572,12 @@
         formStateByPosition[draft.positionId] = JSON.parse(
           JSON.stringify(draft.formState || getDefaultFormState())
         );
+
+        if (draft.customQuestions) {
+          const allCustomQuestions = getAllCustomQuestions();
+          allCustomQuestions[draft.positionId] = draft.customQuestions;
+          setAllCustomQuestions(allCustomQuestions);
+        }
 
         Object.keys(selectedScores).forEach((key) => {
           if (key.startsWith(`${draft.positionId}__`)) {
@@ -470,75 +621,76 @@
         render();
       }
 
-     function renderLanding() {
-  const data = window.INTERVIEW_DATA;
+      function renderLanding() {
+        const data = window.INTERVIEW_DATA;
 
-  return `
-    <div class="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 md:px-10 lg:px-14">
-      <div class="mx-auto w-full max-w-4xl rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_20px_60px_rgba(81,116,173,0.12)] backdrop-blur md:p-8">
-        <div class="mb-8 text-center">
-          <p class="mb-3 text-sm font-medium tracking-[0.18em] text-slate-500">DOZN INTERVIEW GUIDE</p>
-          <h1 class="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">${data.siteTitle}</h1>
-          <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
-            ${data.siteDescription}
-          </p>
-        </div>
+        return `
+          <div class="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 md:px-10 lg:px-14">
+            <div class="mx-auto w-full max-w-4xl rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_20px_60px_rgba(81,116,173,0.12)] backdrop-blur md:p-8">
+              <div class="mb-8 text-center">
+                <p class="mb-3 text-sm font-medium tracking-[0.18em] text-slate-500">DOZN INTERVIEW GUIDE</p>
+                <h1 class="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">${data.siteTitle}</h1>
+                <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+                  ${data.siteDescription}
+                </p>
+              </div>
 
-        <div class="mx-auto max-w-2xl rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-sm md:p-7">
-          <div class="mb-5 text-center">
-            <h2 class="text-2xl font-semibold text-slate-900">${data.labels.openPositions}</h2>
-            <p class="mt-2 text-sm text-slate-500">${data.labels.selectPositionGuide}</p>
-          </div>
+              <div class="mx-auto max-w-2xl rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-sm md:p-7">
+                <div class="mb-5 text-center">
+                  <h2 class="text-2xl font-semibold text-slate-900">${data.labels.openPositions}</h2>
+                  <p class="mt-2 text-sm text-slate-500">${data.labels.selectPositionGuide}</p>
+                </div>
 
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            ${data.positions
-              .map(
-                (position) => `
-              <button
-                onclick="setSelectedPosition('${position.id}')"
-                class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
-                  selectedPositionId === position.id
-                    ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-                }"
-              >
-                ${position.name}
-              </button>
-            `
-              )
-              .join("")}
-          </div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  ${data.positions
+                    .map(
+                      (position) => `
+                    <button
+                      onclick="setSelectedPosition('${position.id}')"
+                      class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
+                        selectedPositionId === position.id
+                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
+                      }"
+                    >
+                      ${position.name}
+                    </button>
+                  `
+                    )
+                    .join("")}
+                </div>
 
-          <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
+                <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
 
-            <div class="flex flex-wrap gap-2">
-              <a
-                href="manual.html"
-                class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
-              >
-                📘 면접 가이드 매뉴얼
-              </a>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      href="manual.html"
+                      class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
+                    >
+                      📘 면접 가이드 매뉴얼
+                    </a>
 
-              <button
-                onclick="startGuide()"
-                class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
-              >
-                ${data.labels.startGuide}
-              </button>
+                    <button
+                      onclick="startGuide()"
+                      class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
+                    >
+                      ${data.labels.startGuide}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
+        `;
+      }
 
       function renderGuide() {
         const data = window.INTERVIEW_DATA;
         const selected = getSelectedPosition();
         const competencies = getCompetencies();
         const navItems = getNavItems();
+        const customQuestions = getCurrentCustomQuestions();
         const form = getFormState();
         const currentFinalDecision = getFinalDecision();
 
@@ -619,28 +771,39 @@
             </div>
 
             <div class="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-              <aside class="h-fit rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur xl:sticky xl:top-6">
-                <p class="mb-3 px-2 text-sm font-semibold text-slate-900">${data.labels.questionSet}</p>
-                <div class="space-y-2">
-                  ${navItems
-                    .map(
-                      (item) => `
-                    <button
-                      onclick="scrollToSection('${item.id}')"
-                      class="w-full rounded-2xl px-4 py-3 text-left transition ${
-                        activeNav === item.id
-                          ? "bg-blue-50 text-blue-700"
-                          : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                      }"
-                    >
-                      <div class="text-sm font-semibold">${item.name}</div>
-                      <div class="mt-1 text-xs text-slate-500">${item.order}</div>
-                    </button>
-                  `
-                    )
-                    .join("")}
-                </div>
-              </aside>
+              <div class="space-y-3 xl:sticky xl:top-6 xl:h-fit">
+                <button
+                  onclick="openCustomQuestionModal()"
+                  class="flex w-full items-center justify-center gap-2 rounded-[22px] bg-orange-500 px-4 py-4 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600"
+                >
+                  + 직무 경험 질문 추가
+                </button>
+
+                <aside class="rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
+                  <p class="mb-3 px-2 text-sm font-semibold text-slate-900">${data.labels.questionSet}</p>
+                  <div class="space-y-2">
+                    ${navItems
+                      .map(
+                        (item) => `
+                      <button
+                        onclick="scrollToSection('${item.id}')"
+                        class="w-full rounded-2xl px-4 py-3 text-left transition ${
+                          activeNav === item.id
+                            ? item.id === CUSTOM_SECTION_ID
+                              ? "bg-orange-50 text-orange-700"
+                              : "bg-blue-50 text-blue-700"
+                            : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        }"
+                      >
+                        <div class="text-sm font-semibold">${item.name}</div>
+                        <div class="mt-1 text-xs text-slate-500">${item.order}</div>
+                      </button>
+                    `
+                      )
+                      .join("")}
+                  </div>
+                </aside>
+              </div>
 
               <main class="space-y-6">
                 ${competencies
@@ -798,6 +961,159 @@
                 `
                   )
                   .join("")}
+
+                <section
+                  id="${CUSTOM_SECTION_ID}"
+                  class="rounded-[30px] border border-orange-100 bg-white/90 p-5 shadow-sm backdrop-blur md:p-6"
+                >
+                  <div class="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <p class="text-sm font-medium text-orange-600">면접관 직접 등록</p>
+                      <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 경험/직무역량 추가 질문</h3>
+                      <p class="mt-2 text-sm leading-6 text-slate-500">
+                        매뉴얼을 참고해 면접 전 직무역량 검증 질문을 미리 등록합니다.
+                      </p>
+                    </div>
+                    <span class="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
+                      질문 ${customQuestions.length}개
+                    </span>
+                  </div>
+
+                  ${
+                    !customQuestions.length
+                      ? `
+                    <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
+                      <p class="text-sm font-semibold text-slate-700">아직 등록된 직무 질문이 없습니다.</p>
+                      <p class="mt-2 text-sm text-slate-500">왼쪽의 직무 경험 질문 추가 버튼으로 면접 전 질문을 등록해두세요.</p>
+                    </div>
+                  `
+                      : `
+                    <div class="space-y-5">
+                      ${customQuestions
+                        .map(
+                          (q, qIndex) => `
+                        <div class="rounded-[26px] border border-slate-200/80 bg-slate-50/70 p-5">
+                          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <span class="rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">
+                                ${q.type}
+                              </span>
+                              <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                                면접관 직접 등록
+                              </span>
+                            </div>
+                            <button
+                              onclick="deleteCustomQuestion('${q.id}')"
+                              class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                            >
+                              삭제
+                            </button>
+                          </div>
+
+                          <div class="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                            <div>
+                              <p class="text-sm font-semibold text-slate-500">${data.labels.mainQuestion}</p>
+                              <p class="mt-2 text-lg font-medium leading-8 text-slate-900">${escapeHtml(q.main)}</p>
+
+                              ${
+                                q.follow && q.follow.length
+                                  ? `
+                              <div class="mt-5">
+                                <p class="text-sm font-semibold text-slate-500">${data.labels.followUp}</p>
+                                <ul class="mt-2 space-y-2 text-sm leading-7 text-slate-700">
+                                  ${q.follow
+                                    .map(
+                                      (f) => `
+                                    <li class="rounded-2xl bg-white px-4 py-3 shadow-sm">${escapeHtml(f)}</li>
+                                  `
+                                    )
+                                    .join("")}
+                                </ul>
+                              </div>
+                              `
+                                  : ""
+                              }
+
+                              <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-sm font-semibold text-slate-900">질문의도·확인포인트</p>
+                                <div class="mt-3 text-sm leading-6 text-slate-600">
+                                  ${escapeHtml(q.rubric?.purpose || getCustomQuestionRubric().purpose)}
+                                </div>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                  ${(q.points || [])
+                                    .map(
+                                      (p) => `
+                                    <span class="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">#${escapeHtml(p)}</span>
+                                  `
+                                    )
+                                    .join("")}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="space-y-4">
+                              <div class="rounded-2xl border border-blue-100 bg-white p-4">
+                                <p class="text-sm font-semibold text-slate-900">${data.labels.rubric}</p>
+                                <div class="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.goodSignal}</p>
+                                    <p>${escapeHtml(q.rubric?.good || getCustomQuestionRubric().good)}</p>
+                                  </div>
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.averageAnswer}</p>
+                                    <p>${escapeHtml(q.rubric?.average || getCustomQuestionRubric().average)}</p>
+                                  </div>
+                                  <div>
+                                    <p class="font-semibold text-slate-700">${data.labels.riskSignal}</p>
+                                    <p>${escapeHtml(q.rubric?.weak || getCustomQuestionRubric().weak)}</p>
+                                  </div>
+                                </div>
+
+                                <div class="mt-5 border-t border-slate-100 pt-4">
+                                  <p class="text-sm font-semibold text-slate-900">점수 선택</p>
+                                  <div class="mt-3 flex flex-wrap gap-2">
+                                    ${[1, 2, 3, 4, 5]
+                                      .map((score) => {
+                                        const selectedScore = getQuestionScore(CUSTOM_SECTION_ID, qIndex);
+                                        return `
+                                          <button
+                                            onclick="setQuestionScore('${CUSTOM_SECTION_ID}', ${qIndex}, ${score})"
+                                            class="min-w-[44px] rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                                              selectedScore === score
+                                                ? "border-blue-500 bg-blue-50 text-blue-700"
+                                                : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:bg-blue-50/40"
+                                            }"
+                                          >
+                                            ${score}점
+                                          </button>
+                                        `;
+                                      })
+                                      .join("")}
+                                  </div>
+                                  <p class="mt-3 text-xs leading-5 text-slate-400">
+                                    위의 답변 신호에 따라 점수를 선택해주세요.
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-sm font-semibold text-slate-900">${data.labels.memo}</p>
+                                <textarea
+                                  class="mt-3 h-40 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                                  placeholder="${data.labels.memoPlaceholder}"
+                                  oninput="setQuestionMemo('${CUSTOM_SECTION_ID}', ${qIndex}, this.value)"
+                                >${escapeHtml(getQuestionMemo(CUSTOM_SECTION_ID, qIndex))}</textarea>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      `
+                        )
+                        .join("")}
+                    </div>
+                  `
+                  }
+                </section>
 
                 <section id="final-review" class="rounded-[30px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -1113,6 +1429,51 @@
                     .join("")}
                 </div>
 
+                ${
+                  customQuestions.length
+                    ? `
+                <div class="mt-6 space-y-5">
+                  <div class="pdf-break-avoid rounded-3xl border border-orange-100 p-5">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p class="text-sm font-medium text-orange-600">면접관 직접 등록</p>
+                        <p class="text-xl font-semibold text-slate-900">직무 경험/직무역량 추가 질문</p>
+                      </div>
+                    </div>
+
+                    ${customQuestions
+                      .map((q, qIndex) => {
+                        const memo = getQuestionMemo(CUSTOM_SECTION_ID, qIndex);
+                        const score = getQuestionScore(CUSTOM_SECTION_ID, qIndex);
+                        return `
+                          <div class="mt-4 rounded-2xl bg-slate-50 p-4">
+                            <div class="mb-2 inline-flex rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
+                              ${escapeHtml(q.type)}
+                            </div>
+                            <p class="text-sm font-semibold text-slate-900">${data.labels.mainQuestion}</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-700">${escapeHtml(q.main)}</p>
+                            ${
+                              q.follow?.length
+                                ? `<p class="mt-2 text-sm leading-6 text-slate-600"><span class="font-semibold text-slate-900">꼬리 질문</span> : ${q.follow.map(escapeHtml).join(" / ")}</p>`
+                                : ""
+                            }
+                            <div class="mt-3 text-sm text-slate-600">
+                              <span class="font-semibold text-slate-900">점수</span> : ${score || "-"} / 5
+                            </div>
+                            <div class="mt-3">
+                              <p class="text-sm font-semibold text-slate-900">${data.labels.memoSummary}</p>
+                              <p class="mt-2 text-sm leading-6 text-slate-700">${memo ? nl2br(memo) : "작성된 메모 없음"}</p>
+                            </div>
+                          </div>
+                        `;
+                      })
+                      .join("")}
+                  </div>
+                </div>
+                `
+                    : ""
+                }
+
                 <div class="mt-6 grid gap-5 lg:grid-cols-2">
                   <div class="rounded-3xl border border-slate-200 p-5">
                     <p class="text-lg font-semibold text-slate-900">${data.labels.overallCommentTitle}</p>
@@ -1140,6 +1501,85 @@
                     <p class="text-2xl font-semibold">${escapeHtml(currentFinalDecision)}</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderCustomQuestionModal() {
+        if (!showCustomQuestionModal) return "";
+
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+            <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
+              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <p class="text-sm font-medium text-orange-600">직무 질문 등록</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 경험 질문 추가</h3>
+                  <p class="mt-2 text-sm text-slate-500">필수 항목은 메인 질문 1개뿐입니다. 평가기준은 자동으로 적용됩니다.</p>
+                </div>
+                <button
+                  onclick="closeCustomQuestionModal()"
+                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div class="grid gap-4">
+                <label class="text-sm font-semibold text-slate-700">
+                  질문 유형
+                  <select
+                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                    onchange="updateCustomQuestionForm('type', this.value)"
+                  >
+                    ${CUSTOM_QUESTION_TYPES
+                      .map(
+                        (type) => `
+                      <option value="${type}" ${customQuestionForm.type === type ? "selected" : ""}>${type}</option>
+                    `
+                      )
+                      .join("")}
+                  </select>
+                </label>
+
+                <label class="text-sm font-semibold text-slate-700">
+                  메인 질문 <span class="text-rose-500">*</span>
+                  <textarea
+                    class="mt-2 h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                    placeholder="예: 해당 직무에서 가장 중요하게 생각하는 업무 원칙과 실제 적용 경험을 말씀해주세요."
+                    oninput="updateCustomQuestionForm('main', this.value)"
+                  >${escapeHtml(customQuestionForm.main)}</textarea>
+                </label>
+
+                <label class="text-sm font-semibold text-slate-700">
+                  꼬리 질문 <span class="text-xs font-medium text-slate-400">선택</span>
+                  <textarea
+                    class="mt-2 h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                    placeholder="예: 그 기준을 지키기 어려웠던 상황에서는 어떻게 대응하셨나요?"
+                    oninput="updateCustomQuestionForm('follow', this.value)"
+                  >${escapeHtml(customQuestionForm.follow)}</textarea>
+                </label>
+
+                <div class="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm leading-6 text-orange-800">
+                  등록 후에는 공통 평가기준과 질문 유형별 확인 포인트가 자동으로 붙고, 기존 질문과 동일하게 점수와 면접 메모를 남길 수 있습니다.
+                </div>
+              </div>
+
+              <div class="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-5">
+                <button
+                  onclick="closeCustomQuestionModal()"
+                  class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+                >
+                  취소
+                </button>
+                <button
+                  onclick="saveCustomQuestion()"
+                  class="rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
+                >
+                  등록하기
+                </button>
               </div>
             </div>
           </div>
@@ -1229,7 +1669,8 @@
           !showScrollTopButton ||
           showPdfPreview ||
           showCautionModal ||
-          showDraftModal
+          showDraftModal ||
+          showCustomQuestionModal
         ) {
           return "";
         }
@@ -1281,6 +1722,7 @@
           ${currentPage === "landing" ? renderLanding() : renderGuide()}
           ${renderCautionModal()}
           ${renderPdfPreview()}
+          ${renderCustomQuestionModal()}
           ${renderDraftModal()}
           ${renderScrollTopButton()}
         `;
@@ -1297,6 +1739,11 @@
       window.closeCautionModal = closeCautionModal;
       window.openDraftModal = openDraftModal;
       window.closeDraftModal = closeDraftModal;
+      window.openCustomQuestionModal = openCustomQuestionModal;
+      window.closeCustomQuestionModal = closeCustomQuestionModal;
+      window.updateCustomQuestionForm = updateCustomQuestionForm;
+      window.saveCustomQuestion = saveCustomQuestion;
+      window.deleteCustomQuestion = deleteCustomQuestion;
       window.setQuestionScore = setQuestionScore;
       window.setQuestionMemo = setQuestionMemo;
       window.updateFormField = updateFormField;
@@ -1323,7 +1770,8 @@
             window.scrollY > 900 &&
             !showPdfPreview &&
             !showCautionModal &&
-            !showDraftModal;
+            !showDraftModal &&
+            !showCustomQuestionModal;
 
           if (shouldShow !== showScrollTopButton) {
             showScrollTopButton = shouldShow;
