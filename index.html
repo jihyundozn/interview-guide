@@ -776,7 +776,7 @@
                   onclick="openCustomQuestionModal()"
                   class="flex w-full items-center justify-center gap-2 rounded-[22px] bg-orange-500 px-4 py-4 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600"
                 >
-                  + 직무 경험 질문 추가
+                  + 직무 전문성 검증 질문 추가
                 </button>
 
                 <aside class="rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
@@ -969,9 +969,9 @@
                   <div class="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
                       <p class="text-sm font-medium text-orange-600">면접관 직접 등록</p>
-                      <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 경험/직무역량 추가 질문</h3>
+                      <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 전문성/직무역량 추가 질문</h3>
                       <p class="mt-2 text-sm leading-6 text-slate-500">
-                        매뉴얼을 참고해 면접 전 직무역량 검증 질문을 미리 등록합니다.
+                        매뉴얼을 참고해 면접 전 질문을 미리 등록합니다.
                       </p>
                     </div>
                     <span class="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
@@ -983,8 +983,8 @@
                     !customQuestions.length
                       ? `
                     <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                      <p class="text-sm font-semibold text-slate-700">아직 등록된 직무 질문이 없습니다.</p>
-                      <p class="mt-2 text-sm text-slate-500">왼쪽의 직무 경험 질문 추가 버튼으로 면접 전 질문을 등록해두세요.</p>
+                      <p class="text-sm font-semibold text-slate-700">아직 등록된 질문이 없습니다.</p>
+                      <p class="mt-2 text-sm text-slate-500">왼쪽의 질문 추가 버튼으로 면접 전 질문을 등록해두세요.</p>
                     </div>
                   `
                       : `
@@ -1437,7 +1437,7 @@
                     <div class="mb-3 flex items-center justify-between gap-3">
                       <div>
                         <p class="text-sm font-medium text-orange-600">면접관 직접 등록</p>
-                        <p class="text-xl font-semibold text-slate-900">직무 경험/직무역량 추가 질문</p>
+                        <p class="text-xl font-semibold text-slate-900">직무 전문성/역량 추가 질문</p>
                       </div>
                     </div>
 
@@ -1515,9 +1515,9 @@
             <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
               <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
-                  <p class="text-sm font-medium text-orange-600">직무 질문 등록</p>
-                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 경험 질문 추가</h3>
-                  <p class="mt-2 text-sm text-slate-500">필수 항목은 메인 질문 1개뿐입니다. 평가기준은 자동으로 적용됩니다.</p>
+                  <p class="text-sm font-medium text-orange-600">질문 등록</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">직무 전문성 질문 추가</h3>
+                  <p class="mt-2 text-sm text-slate-500">메인 질문은 필수항목이며, 평가기준은 자동으로 적용됩니다.</p>
                 </div>
                 <button
                   onclick="closeCustomQuestionModal()"
@@ -1563,7 +1563,7 @@
                 </label>
 
                 <div class="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm leading-6 text-orange-800">
-                  등록 후에는 공통 평가기준과 질문 유형별 확인 포인트가 자동으로 붙고, 기존 질문과 동일하게 점수와 면접 메모를 남길 수 있습니다.
+                  등록 후에는 공통 평가기준과 질문 유형별 확인 포인트가 자동으로 작성되며, 기존 질문과 동일하게 점수와 면접 메모를 남길 수 있습니다.
                 </div>
               </div>
 
