@@ -470,59 +470,69 @@
         render();
       }
 
-      function renderLanding() {
-        const data = window.INTERVIEW_DATA;
+     function renderLanding() {
+  const data = window.INTERVIEW_DATA;
 
-        return `
-          <div class="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 md:px-10 lg:px-14">
-            <div class="mx-auto w-full max-w-4xl rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_20px_60px_rgba(81,116,173,0.12)] backdrop-blur md:p-8">
-              <div class="mb-8 text-center">
-                <p class="mb-3 text-sm font-medium tracking-[0.18em] text-slate-500">DOZN INTERVIEW GUIDE</p>
-                <h1 class="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">${data.siteTitle}</h1>
-                <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
-                  ${data.siteDescription}
-                </p>
-              </div>
+  return `
+    <div class="relative mx-auto flex min-h-screen max-w-7xl items-center px-6 py-10 md:px-10 lg:px-14">
+      <div class="mx-auto w-full max-w-4xl rounded-[32px] border border-white/60 bg-white/70 p-6 shadow-[0_20px_60px_rgba(81,116,173,0.12)] backdrop-blur md:p-8">
+        <div class="mb-8 text-center">
+          <p class="mb-3 text-sm font-medium tracking-[0.18em] text-slate-500">DOZN INTERVIEW GUIDE</p>
+          <h1 class="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">${data.siteTitle}</h1>
+          <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+            ${data.siteDescription}
+          </p>
+        </div>
 
-              <div class="mx-auto max-w-2xl rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-sm md:p-7">
-                <div class="mb-5 text-center">
-                  <h2 class="text-2xl font-semibold text-slate-900">${data.labels.openPositions}</h2>
-                  <p class="mt-2 text-sm text-slate-500">${data.labels.selectPositionGuide}</p>
-                </div>
+        <div class="mx-auto max-w-2xl rounded-[28px] border border-slate-200/70 bg-white/90 p-6 shadow-sm md:p-7">
+          <div class="mb-5 text-center">
+            <h2 class="text-2xl font-semibold text-slate-900">${data.labels.openPositions}</h2>
+            <p class="mt-2 text-sm text-slate-500">${data.labels.selectPositionGuide}</p>
+          </div>
 
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  ${data.positions
-                    .map(
-                      (position) => `
-                    <button
-                      onclick="setSelectedPosition('${position.id}')"
-                      class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
-                        selectedPositionId === position.id
-                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-                      }"
-                    >
-                      ${position.name}
-                    </button>
-                  `
-                    )
-                    .join("")}
-                </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            ${data.positions
+              .map(
+                (position) => `
+              <button
+                onclick="setSelectedPosition('${position.id}')"
+                class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
+                  selectedPositionId === position.id
+                    ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
+                }"
+              >
+                ${position.name}
+              </button>
+            `
+              )
+              .join("")}
+          </div>
 
-                <div class="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
-                  <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
-                  <button
-                    onclick="startGuide()"
-                    class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
-                  >
-                    ${data.labels.startGuide}
-                  </button>
-                </div>
-              </div>
+          <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
+
+            <div class="flex flex-wrap gap-2">
+              <a
+                href="manual.html"
+                class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
+              >
+                📘 매뉴얼 사용 가이드
+              </a>
+
+              <button
+                onclick="startGuide()"
+                class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
+              >
+                ${data.labels.startGuide}
+              </button>
             </div>
           </div>
-        `;
-      }
+        </div>
+      </div>
+    </div>
+  `;
+}
 
       function renderGuide() {
         const data = window.INTERVIEW_DATA;
