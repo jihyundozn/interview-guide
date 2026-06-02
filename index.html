@@ -1335,14 +1335,15 @@
         `;
       }
 
-      function renderPdfPreview() {
-        if (!showPdfPreview) return "";
+function renderPdfPreview() {
+  if (!showPdfPreview) return "";
 
-        const data = window.INTERVIEW_DATA;
-        const selected = getSelectedPosition();
-        const competencies = getCompetencies();
-        const form = getFormState();
-        const currentFinalDecision = getFinalDecision();
+  const data = window.INTERVIEW_DATA;
+  const selected = getSelectedPosition();
+  const competencies = getCompetencies();
+  const customQuestions = getCurrentCustomQuestions();
+  const form = getFormState();
+  const currentFinalDecision = getFinalDecision();
 
         return `
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
