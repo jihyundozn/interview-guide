@@ -1,5 +1,5 @@
 window.INTERVIEW_DATA = {
-  siteTitle: "구조화 면접 가이드",
+  siteTitle: "더즌 구조화 면접 가이드",
   siteDescription:
     "포지션 선택 후, 사전 미팅 기반으로 설계된 질문 세트와 평가 기준을 바로 확인할 수 있습니다.",
   scoreGuide: "1점: 매우부족 / 3점: 기대충족 / 5점: 탁월",
@@ -50,11 +50,11 @@ window.INTERVIEW_DATA = {
   },
   positions: [
     {
-      id: "backend-developer",
-      name: "백엔드개발",
-      guideTitle: "백엔드개발자 구조화 면접 가이드",
+      id: "kiosk-backend-developer",
+      name: "키오스크개발팀_백엔드개발",
+      guideTitle: "키오스크개발팀 백엔드개발 구조화 면접 가이드",
       summary:
-        "사전 미팅에서 정의한 핵심 역량을 바탕으로, 백엔드개발 포지션 면접에서 바로 활용할 수 있도록 질문과 평가 기준을 정리한 면접 가이드입니다.",
+        "사전 미팅에서 정의한 핵심 역량을 바탕으로, 키오스크개발팀 백엔드개발 포지션 면접에서 바로 활용할 수 있도록 질문과 평가 기준을 정리한 면접 가이드입니다.",
       competencies: [
         {
           id: "problem-solving",
@@ -249,7 +249,7 @@ window.INTERVIEW_DATA = {
         interviewers: "오지현",
         interviewDate: "2026.05.01",
         overallComment:
-          "백엔드개발 포지션용 샘플 종합 의견입니다. 문제해결력, 책임감, 이해관계 조율, 직무 전문성 측면에서 확인된 내용을 중심으로 정리해주세요.",
+          "키오스크개발팀 백엔드개발 포지션용 샘플 종합 의견입니다. 문제해결력, 책임감, 이해관계 조율, 직무 전문성 측면에서 확인된 내용을 중심으로 정리해주세요.",
         followUps: [
           "요구사항이 모호한 상황에서의 실제 확인 방식",
           "마감기한 지연 가능성 발생 시 공유 시점과 대응 방식",
