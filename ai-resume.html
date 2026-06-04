@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI 이력서 분석</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <style>
+      @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: "Pretendard", "Noto Sans KR", sans-serif;
+        color: #1e293b;
+        background: linear-gradient(135deg, #edf5ff 0%, #dcecff 40%, #eef3ff 100%);
+      }
+      body { min-height: 100vh; }
+      button, input, textarea, select { font: inherit; }
+      .bg-orb-1, .bg-orb-2, .bg-orb-3 {
+        position: fixed;
+        pointer-events: none;
+        filter: blur(40px);
+        z-index: 0;
+      }
+      .bg-orb-1 {
+        top: -80px; left: -80px; width: 340px; height: 340px; border-radius: 48px;
+        background: radial-gradient(circle at top left, rgba(255, 232, 246, 0.65), rgba(255, 255, 255, 0) 70%);
+      }
+      .bg-orb-2 {
+        top: 40px; right: 0; width: 420px; height: 420px; border-radius: 999px;
+        background: radial-gradient(circle, rgba(176, 213, 255, 0.35), rgba(255, 255, 255, 0) 70%);
+      }
+      .bg-orb-3 {
+        bottom: 0; left: 30%; width: 300px; height: 300px; border-radius: 999px;
+        background: radial-gradient(circle, rgba(220, 236, 255, 0.55), rgba(255, 255, 255, 0) 72%);
+      }
+      .app-shell { position: relative; z-index: 1; min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div class="bg-orb-1"></div>
+    <div class="bg-orb-2"></div>
+    <div class="bg-orb-3"></div>
+    <div id="app" class="app-shell"></div>
+
+    <script src="interview-data.js"></script>
+    <script>
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      }
+
+      const app = document.getElementById("app");
+      const CANDIDATE_STORAGE_KEY = "dozn_interview_candidates_v1";
+      const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v2";
+
+      let selectedPositionId = new URLSearchParams(window.location.search).get("positionId") || window.INTERVIEW_DATA.positions[0]?.id || "";
+      let candidateName = "";
+      let resumeText = "";
+      let apiKey = sessionStorage.getItem("dozn_openai_api_key") || "";
+      let modelName = sessionStorage.getItem("dozn_openai_model") || "gpt-5.5";
+      let isAnalyzing = false;
+      let isPdfParsing = false;
+      let errorMessage = "";
+      let selectedQuestionIds = {};
+      let analysisResult = null;
+
+      function getSelectedPosition() {
+        return window.INTERVIEW_DATA.positions.find((position) => position.id === selectedPositionId) || window.INTERVIEW_DATA.positions[0];
+      }
+
+      function getPositionContext(position = getSelectedPosition()) {
+        const competencies = position?.competencies || [];
+        const standardQuestions = competencies.flatMap((section) =>
+          (section.questions || []).map((q) => ({
+            competency: section.name,
+            question: q.main,
+            type: q.type,
+          }))
+        );
+
+        return {
+          positionId: position?.id || "",
+          positionName: position?.name || "",
+          guideTitle: position?.guideTitle || "",
+          summary: position?.summary || "",
+          competencies: competencies.map((item) => ({
+            id: item.id,
+            name: item.name,
+            order: item.order,
+            points: (item.questions || []).flatMap((q) => q.points || []).slice(0, 8),
+          })),
+          standardQuestions,
+        };
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function nl2br(value) {
+        return escapeHtml(value).replace(/\n/g, "<br>");
+      }
+
+      function formatDate(date = new Date()) {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const dd = String(date.getDate()).padStart(2, "0");
+        const hh = String(date.getHours()).padStart(2, "0");
+        const mi = String(date.getMinutes()).padStart(2, "0");
+        return `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
+      }
+
+      function getAllCandidates() {
+        try {
+          return JSON.parse(localStorage.getItem(CANDIDATE_STORAGE_KEY)) || {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function setAllCandidates(data) {
+        localStorage.setItem(CANDIDATE_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function getAllCustomQuestions() {
+        try {
+          return JSON.parse(localStorage.getItem(CUSTOM_QUESTION_STORAGE_KEY)) || {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function setAllCustomQuestions(data) {
+        localStorage.setItem(CUSTOM_QUESTION_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function normalizeList(value) {
+        if (Array.isArray(value)) return value.filter(Boolean).map((item) => String(item).trim()).filter(Boolean);
+        if (!value) return [];
+        return String(value).split(/\n|;/).map((item) => item.trim()).filter(Boolean);
+      }
+
+      function getQuestionRubric() {
+        return {
+          purpose: "후보자 이력서에 기재된 특정 경험의 실제 수행 범위, 본인 기여도, 성과 근거를 확인합니다.",
+          good: "이력서에 기재된 경험을 본인 역할, 판단 기준, 실행 과정, 결과 근거와 함께 구체적으로 설명합니다.",
+          average: "경험 자체는 설명하나 본인 기여도나 성과 근거가 일부 불명확합니다.",
+          weak: "팀 성과를 일반적으로 설명하거나 실제 수행 범위, 수치 기준, 의사결정 내용을 명확히 답변하지 못합니다.",
+        };
+      }
+
+      function normalizeQuestion(question, index) {
+        const rubric = getQuestionRubric();
+        return {
+          id: question.id || `ai_question_${Date.now()}_${index}`,
+          type: question.type || "AI 이력서 기반",
+          main: question.main || question.question || "",
+          follow: normalizeList(question.follow || question.followUp),
+          points: normalizeList(question.points || question.checkPoints || question.verificationFocus),
+          intent: question.intent || "",
+          sourceEvidence: question.sourceEvidence || question.evidence || "",
+          relatedCompetency: question.relatedCompetency || "",
+          rubric: {
+            purpose: question.intent || rubric.purpose,
+            good: rubric.good,
+            average: rubric.average,
+            weak: rubric.weak,
+          },
+        };
+      }
+
+      function normalizeAnalysis(raw) {
+        const questions = (raw.customQuestions || raw.recommendedQuestions || raw.questions || []).map(normalizeQuestion);
+        return {
+          summary: raw.summary || raw.candidateSummary || "",
+          strengths: normalizeList(raw.strengths),
+          concerns: normalizeList(raw.concerns || raw.risks),
+          verificationPoints: normalizeList(raw.verificationPoints || raw.checkPoints),
+          questions,
+        };
+      }
+
+      async function handlePdfUpload(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith(".pdf")) {
+          alert("PDF 파일만 업로드할 수 있습니다.");
+          input.value = "";
+          return;
+        }
+
+        isPdfParsing = true;
+        errorMessage = "";
+        render();
+
+        try {
+          const buffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+          const maxPages = Math.min(pdf.numPages, 20);
+          const pages = [];
+
+          for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const content = await page.getTextContent();
+            const text = content.items.map((item) => item.str).join(" ");
+            pages.push(`[${pageNumber}p] ${text}`);
+          }
+
+          resumeText = pages.join("\n\n").trim();
+          if (!resumeText) {
+            errorMessage = "PDF에서 텍스트를 추출하지 못했습니다. 이미지형 PDF라면 텍스트를 직접 붙여넣어 주세요.";
+          }
+        } catch (error) {
+          console.error(error);
+          errorMessage = "PDF를 읽는 중 오류가 발생했습니다. 텍스트를 직접 붙여넣어 주세요.";
+        } finally {
+          isPdfParsing = false;
+          render();
+        }
+      }
+
+      function buildPrompt() {
+        const positionContext = getPositionContext();
+        const existingQuestions = positionContext.standardQuestions.slice(0, 80).map((item, index) => `${index + 1}. [${item.competency}] ${item.question}`).join("\n");
+
+        return `아래 포지션 정보와 지원자 이력서를 바탕으로 면접관이 사전에 확인해야 할 내용을 분석하세요.\n\n중요 원칙:\n- 합격/불합격을 판단하지 말고, 면접 전 검토 보조자료로 작성하세요.\n- 기존 구조화면접 가이드에 있는 일반 질문과 중복되는 질문을 만들지 마세요.\n- 추천 질문은 이 후보자의 이력서에 기재된 특정 경험, 프로젝트, 성과, 경력 흐름에 기반한 개인화 질문이어야 합니다.\n- 질문은 진위 확인, 본인 기여도, 성과 근거, 업무 범위, JD와의 연결성, 우려사항 확인에 초점을 맞추세요.\n- 민감정보, 차별 소지가 있는 내용, 사생활 질문은 제외하세요.\n\n[포지션 정보]\n${JSON.stringify(positionContext, null, 2)}\n\n[기존 구조화면접 질문 예시 - 중복 금지]\n${existingQuestions}\n\n[지원자 이력서 텍스트]\n${resumeText.slice(0, 30000)}`;
+      }
+
+      function getAnalysisSchema() {
+        return {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            summary: { type: "string" },
+            strengths: { type: "array", items: { type: "string" } },
+            concerns: { type: "array", items: { type: "string" } },
+            verificationPoints: { type: "array", items: { type: "string" } },
+            customQuestions: {
+              type: "array",
+              minItems: 4,
+              maxItems: 8,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  type: { type: "string" },
+                  main: { type: "string" },
+                  follow: { type: "array", items: { type: "string" } },
+                  intent: { type: "string" },
+                  relatedCompetency: { type: "string" },
+                  sourceEvidence: { type: "string" },
+                  points: { type: "array", items: { type: "string" } },
+                },
+                required: ["type", "main", "follow", "intent", "relatedCompetency", "sourceEvidence", "points"],
+              },
+            },
+          },
+          required: ["summary", "strengths", "concerns", "verificationPoints", "customQuestions"],
+        };
+      }
+
+      function extractOutputText(data) {
+        if (data.output_text) return data.output_text;
+        const chunks = [];
+        (data.output || []).forEach((item) => {
+          (item.content || []).forEach((content) => {
+            if (content.text) chunks.push(content.text);
+            if (content.type === "output_text" && content.text) chunks.push(content.text);
+          });
+        });
+        return chunks.join("\n");
+      }
+
+      async function analyzeResume() {
+        if (!apiKey.trim()) {
+          alert("OpenAI API Key를 입력해주세요. 데모용으로 브라우저 세션에만 보관됩니다.");
+          return;
+        }
+        if (!resumeText.trim()) {
+          alert("이력서 PDF를 업로드하거나 텍스트를 붙여넣어 주세요.");
+          return;
+        }
+
+        isAnalyzing = true;
+        errorMessage = "";
+        selectedQuestionIds = {};
+        sessionStorage.setItem("dozn_openai_api_key", apiKey.trim());
+        sessionStorage.setItem("dozn_openai_model", modelName.trim() || "gpt-5.5");
+        render();
+
+        try {
+          const response = await fetch("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey.trim()}`,
+            },
+            body: JSON.stringify({
+              model: modelName.trim() || "gpt-5.5",
+              store: false,
+              input: [
+                {
+                  role: "system",
+                  content: [
+                    {
+                      type: "input_text",
+                      text: "당신은 채용담당자와 현업 면접관을 돕는 HR 어시스턴트입니다. 모든 응답은 한국어로 작성하고, 반드시 요청한 JSON 구조만 반환하세요.",
+                    },
+                  ],
+                },
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "input_text",
+                      text: buildPrompt(),
+                    },
+                  ],
+                },
+              ],
+              text: {
+                format: {
+                  type: "json_schema",
+                  name: "resume_interview_analysis",
+                  strict: true,
+                  schema: getAnalysisSchema(),
+                },
+              },
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error?.message || "AI 분석 요청에 실패했습니다.");
+          }
+
+          const outputText = extractOutputText(data);
+          if (!outputText) throw new Error("AI 응답에서 분석 결과를 찾지 못했습니다.");
+
+          analysisResult = normalizeAnalysis(JSON.parse(outputText));
+          analysisResult.questions.forEach((question) => {
+            selectedQuestionIds[question.id] = true;
+          });
+        } catch (error) {
+          console.error(error);
+          errorMessage = error.message || "AI 분석 중 오류가 발생했습니다.";
+        } finally {
+          isAnalyzing = false;
+          render();
+        }
+      }
+
+      function generateDemoAnalysis() {
+        if (!resumeText.trim()) {
+          alert("이력서 PDF를 업로드하거나 텍스트를 붙여넣어 주세요.");
+          return;
+        }
+
+        const selected = getSelectedPosition();
+        const firstCompetency = selected?.competencies?.[0]?.name || "직무역량";
+        const secondCompetency = selected?.competencies?.[1]?.name || "문제해결력";
+        const sampleEvidence = resumeText.slice(0, 80).replace(/\s+/g, " ") || "이력서 주요 경험";
+
+        analysisResult = normalizeAnalysis({
+          summary: `${selected.name} 포지션 기준으로 이력서에 기재된 경험을 검토한 결과, 관련 업무 경험은 일부 확인됩니다. 다만 실제 수행 범위, 본인 기여도, 성과 수치의 기준은 면접에서 추가 확인이 필요합니다.`,
+          strengths: [
+            `${selected.name}와 연결될 수 있는 유관 경험이 확인됩니다.`,
+            "프로젝트 또는 운영 업무를 수행한 경험이 일부 드러납니다.",
+            "협업 또는 문제 해결 경험으로 확장해 확인할 수 있는 소재가 있습니다.",
+          ],
+          concerns: [
+            "팀 성과와 개인 기여도가 명확히 구분되어 있지 않을 수 있습니다.",
+            "성과 수치나 개선 결과의 측정 기준이 불명확합니다.",
+            "지원 포지션의 핵심업무와 직접 연결되는 경험 수준은 면접에서 확인이 필요합니다.",
+          ],
+          verificationPoints: [
+            "이력서에 기재된 주요 프로젝트에서 본인이 직접 담당한 범위 확인",
+            "성과 수치의 산정 기준과 개선 전후 비교 방식 확인",
+            `${firstCompetency} 관점에서 실제 행동 사례 확인`,
+            `${secondCompetency} 관점에서 문제를 정의하고 해결한 방식 확인`,
+          ],
+          customQuestions: [
+            {
+              type: "AI 이력서 기반",
+              main: `이력서에 기재된 주요 경험 중 ${selected.name} 포지션과 가장 직접적으로 연결된다고 생각하는 사례를 하나 선택해, 본인이 맡은 역할과 의사결정 범위를 설명해 주세요.`,
+              follow: ["해당 업무에서 본인이 직접 판단하거나 개선한 부분은 무엇이었나요?"],
+              intent: "지원자의 경험이 포지션 핵심업무와 실제로 연결되는지 확인하기 위함",
+              relatedCompetency: firstCompetency,
+              sourceEvidence: sampleEvidence,
+              points: ["직무 연결성", "본인 역할", "의사결정 범위"],
+            },
+            {
+              type: "AI 이력서 기반",
+              main: "이력서에 작성한 성과나 개선 결과가 있다면, 개선 전후를 어떤 기준으로 비교했는지 설명해 주세요.",
+              follow: ["해당 수치나 결과에서 본인 기여도는 어느 정도였나요?"],
+              intent: "성과의 실질성과 측정 기준을 확인하기 위함",
+              relatedCompetency: secondCompetency,
+              sourceEvidence: "이력서 내 성과 또는 개선 경험",
+              points: ["성과 기준", "개선 전후", "기여도"],
+            },
+            {
+              type: "AI 이력서 기반",
+              main: "기재된 프로젝트나 업무가 팀 단위로 수행된 경험이라면, 전체 과정 중 본인이 주도한 부분과 협업한 부분을 구분해서 설명해 주세요.",
+              follow: ["본인이 없었다면 결과가 달라졌을 지점은 무엇이었다고 보시나요?"],
+              intent: "팀 성과와 개인 기여도를 구분하기 위함",
+              relatedCompetency: "협업·커뮤니케이션",
+              sourceEvidence: "이력서 내 프로젝트 경험",
+              points: ["개인 기여", "협업 범위", "주도성"],
+            },
+            {
+              type: "AI 이력서 기반",
+              main: `현재 이력서만 보면 ${selected.name} 업무와 직접 연결되는 경험 중 추가 설명이 필요한 부분이 있습니다. 이 포지션에서 가장 빠르게 기여할 수 있는 업무는 무엇이라고 보시나요?`,
+              follow: ["그렇게 판단한 근거가 되는 과거 경험을 함께 말씀해 주세요."],
+              intent: "직무 이해도와 경험 전이 가능성을 확인하기 위함",
+              relatedCompetency: "직무 적합성",
+              sourceEvidence: "포지션 JD와 이력서 경력 흐름 비교",
+              points: ["직무 이해도", "경험 전이", "초기 기여 가능성"],
+            },
+          ],
+        });
+
+        selectedQuestionIds = {};
+        analysisResult.questions.forEach((question) => {
+          selectedQuestionIds[question.id] = true;
+        });
+        render();
+      }
+
+      function toggleQuestion(questionId) {
+        selectedQuestionIds[questionId] = !selectedQuestionIds[questionId];
+        render();
+      }
+
+      function saveToGuide() {
+        if (!analysisResult) {
+          alert("먼저 AI 분석 결과를 생성해주세요.");
+          return;
+        }
+        const name = candidateName.trim();
+        if (!name) {
+          alert("후보자명을 입력해주세요.");
+          return;
+        }
+
+        const selectedQuestions = analysisResult.questions.filter((question) => selectedQuestionIds[question.id]);
+        if (!selectedQuestions.length) {
+          alert("구조화면접 가이드에 추가할 질문을 1개 이상 선택해주세요.");
+          return;
+        }
+
+        const allCandidates = getAllCandidates();
+        const candidates = allCandidates[selectedPositionId] || [];
+        const candidateId = `candidate_${Date.now()}`;
+        const newCandidate = {
+          id: candidateId,
+          name,
+          createdAt: formatDate(),
+          aiBrief: {
+            summary: analysisResult.summary,
+            strengths: analysisResult.strengths,
+            concerns: analysisResult.concerns,
+            verificationPoints: analysisResult.verificationPoints,
+          },
+        };
+
+        candidates.unshift(newCandidate);
+        allCandidates[selectedPositionId] = candidates;
+        setAllCandidates(allCandidates);
+
+        const sessionKey = `${selectedPositionId}__${candidateId}`;
+        const allCustomQuestions = getAllCustomQuestions();
+        allCustomQuestions[sessionKey] = selectedQuestions.map((question, index) => ({
+          id: `ai_custom_${Date.now()}_${index}`,
+          type: question.type || "AI 이력서 기반",
+          main: question.main,
+          follow: question.follow || [],
+          points: question.points?.length ? question.points : [question.relatedCompetency || "이력서 기반 검증"],
+          intent: question.intent || "",
+          sourceEvidence: question.sourceEvidence || "",
+          relatedCompetency: question.relatedCompetency || "",
+          rubric: question.rubric || getQuestionRubric(),
+        }));
+        setAllCustomQuestions(allCustomQuestions);
+
+        window.location.href = `index.html?positionId=${encodeURIComponent(selectedPositionId)}&candidateId=${encodeURIComponent(candidateId)}`;
+      }
+
+      function renderAnalysisCards() {
+        if (!analysisResult) {
+          return `
+            <div class="rounded-[28px] border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
+              <p class="text-sm font-semibold text-slate-700">아직 분석 결과가 없습니다.</p>
+              <p class="mt-2 text-sm text-slate-500">PDF 업로드 후 AI 분석을 실행하면 지원자 요약, 강점, 우려사항, 검증 포인트가 표시됩니다.</p>
+            </div>
+          `;
+        }
+
+        const renderList = (items) => items?.length
+          ? items.map((item) => `<li class="rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">${escapeHtml(item)}</li>`).join("")
+          : `<li class="rounded-2xl bg-white px-4 py-3 text-sm text-slate-400 shadow-sm">내용 없음</li>`;
+
+        return `
+          <div class="grid gap-4">
+            <div class="rounded-[28px] border border-blue-100 bg-blue-50/70 p-5">
+              <p class="text-sm font-semibold text-blue-700">지원자 요약</p>
+              <p class="mt-3 text-sm leading-7 text-slate-700">${nl2br(analysisResult.summary)}</p>
+            </div>
+            <div class="grid gap-4 lg:grid-cols-3">
+              <div class="rounded-[28px] border border-emerald-100 bg-emerald-50/70 p-5">
+                <p class="text-sm font-semibold text-emerald-800">강점</p>
+                <ul class="mt-3 space-y-2">${renderList(analysisResult.strengths)}</ul>
+              </div>
+              <div class="rounded-[28px] border border-rose-100 bg-rose-50/70 p-5">
+                <p class="text-sm font-semibold text-rose-800">우려사항</p>
+                <ul class="mt-3 space-y-2">${renderList(analysisResult.concerns)}</ul>
+              </div>
+              <div class="rounded-[28px] border border-violet-100 bg-violet-50/70 p-5">
+                <p class="text-sm font-semibold text-violet-800">검증 포인트</p>
+                <ul class="mt-3 space-y-2">${renderList(analysisResult.verificationPoints)}</ul>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderQuestionList() {
+        if (!analysisResult?.questions?.length) return "";
+
+        return `
+          <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+            <div class="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <p class="text-sm font-medium text-orange-600">후보자 맞춤 질문</p>
+                <h2 class="mt-1 text-2xl font-semibold text-slate-900">구조화면접 가이드에 추가할 질문 선택</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-500">선택한 질문만 해당 후보자의 면접 페이지에 추가됩니다.</p>
+              </div>
+              <span class="rounded-full bg-orange-50 px-3 py-1 text-sm font-semibold text-orange-700">
+                선택 ${Object.values(selectedQuestionIds).filter(Boolean).length}개
+              </span>
+            </div>
+
+            <div class="space-y-4">
+              ${analysisResult.questions.map((question) => `
+                <div class="rounded-[26px] border ${selectedQuestionIds[question.id] ? "border-orange-200 bg-orange-50/40" : "border-slate-200 bg-slate-50/70"} p-5 transition">
+                  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-orange-700 shadow-sm">${escapeHtml(question.type)}</span>
+                      ${question.relatedCompetency ? `<span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">${escapeHtml(question.relatedCompetency)}</span>` : ""}
+                    </div>
+                    <button
+                      onclick="toggleQuestion('${question.id}')"
+                      class="rounded-full px-4 py-2 text-sm font-semibold transition ${selectedQuestionIds[question.id] ? "bg-orange-500 text-white" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}"
+                    >
+                      ${selectedQuestionIds[question.id] ? "선택됨" : "선택"}
+                    </button>
+                  </div>
+
+                  <p class="text-lg font-semibold leading-8 text-slate-900">${escapeHtml(question.main)}</p>
+
+                  ${question.follow?.length ? `
+                    <div class="mt-4">
+                      <p class="text-sm font-semibold text-slate-500">꼬리 질문</p>
+                      <ul class="mt-2 space-y-2">
+                        ${question.follow.map((item) => `<li class="rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">${escapeHtml(item)}</li>`).join("")}
+                      </ul>
+                    </div>
+                  ` : ""}
+
+                  <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p class="text-sm font-semibold text-slate-900">질문 의도</p>
+                      <p class="mt-2 text-sm leading-6 text-slate-600">${escapeHtml(question.intent)}</p>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                      <p class="text-sm font-semibold text-slate-900">이력서 근거</p>
+                      <p class="mt-2 text-sm leading-6 text-slate-600">${escapeHtml(question.sourceEvidence)}</p>
+                    </div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function render() {
+        const data = window.INTERVIEW_DATA;
+        const selected = getSelectedPosition();
+
+        app.innerHTML = `
+          <div class="relative mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-14">
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="mb-2 inline-flex items-center rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-medium text-slate-500 backdrop-blur">
+                  AI RESUME ANALYSIS
+                </div>
+                <h1 class="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">AI 이력서 분석</h1>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  이력서는 저장하지 않고 분석에만 사용합니다. 선택한 질문과 AI 브리프만 구조화면접 가이드의 후보자 세션에 저장됩니다.
+                </p>
+              </div>
+              <a href="index.html" class="rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur">
+                ← 구조화면접 가이드로 돌아가기
+              </a>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+              <aside class="space-y-4 xl:sticky xl:top-6 xl:h-fit">
+                <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+                  <h2 class="text-xl font-semibold text-slate-900">분석 정보 입력</h2>
+
+                  <label class="mt-5 block text-sm font-semibold text-slate-700">
+                    포지션
+                    <select
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                      onchange="selectedPositionId = this.value; analysisResult = null; render();"
+                    >
+                      ${data.positions.map((position) => `<option value="${position.id}" ${position.id === selectedPositionId ? "selected" : ""}>${escapeHtml(position.name)}</option>`).join("")}
+                    </select>
+                  </label>
+
+                  <label class="mt-4 block text-sm font-semibold text-slate-700">
+                    후보자명 <span class="text-rose-500">*</span>
+                    <input
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                      placeholder="예: 홍길동"
+                      value="${escapeHtml(candidateName)}"
+                      oninput="candidateName = this.value"
+                    />
+                  </label>
+
+                  <label class="mt-4 block text-sm font-semibold text-slate-700">
+                    이력서 PDF 업로드
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm"
+                      onchange="handlePdfUpload(this)"
+                    />
+                  </label>
+
+                  <label class="mt-4 block text-sm font-semibold text-slate-700">
+                    이력서 텍스트 확인/직접 붙여넣기
+                    <textarea
+                      class="mt-2 h-48 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
+                      placeholder="PDF에서 추출된 텍스트가 여기에 표시됩니다. 이미지형 PDF는 텍스트를 직접 붙여넣어 주세요."
+                      oninput="resumeText = this.value"
+                    >${escapeHtml(resumeText)}</textarea>
+                  </label>
+
+                  <div class="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                    실제 후보자 개인정보가 포함된 이력서는 회사 정책 확인 후 사용하세요. 데모 단계에서는 샘플 이력서 사용을 권장합니다.
+                  </div>
+                </section>
+
+                <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+                  <h2 class="text-xl font-semibold text-slate-900">AI 분석 설정</h2>
+                  <p class="mt-2 text-xs leading-5 text-slate-500">API Key는 브라우저 세션에만 저장됩니다. GitHub에 업로드하지 마세요.</p>
+
+                  <label class="mt-4 block text-sm font-semibold text-slate-700">
+                    OpenAI API Key
+                    <input
+                      type="password"
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                      placeholder="sk-..."
+                      value="${escapeHtml(apiKey)}"
+                      oninput="apiKey = this.value"
+                    />
+                  </label>
+
+                  <label class="mt-4 block text-sm font-semibold text-slate-700">
+                    모델명
+                    <input
+                      class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
+                      value="${escapeHtml(modelName)}"
+                      oninput="modelName = this.value"
+                    />
+                  </label>
+
+                  <div class="mt-5 grid gap-2">
+                    <button
+                      onclick="analyzeResume()"
+                      class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)] transition hover:scale-[1.01] disabled:opacity-50"
+                      ${isAnalyzing || isPdfParsing ? "disabled" : ""}
+                    >
+                      ${isAnalyzing ? "AI 분석 중..." : isPdfParsing ? "PDF 읽는 중..." : "AI 분석하기"}
+                    </button>
+                    <button
+                      onclick="generateDemoAnalysis()"
+                      class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    >
+                      API 없이 데모 분석 생성
+                    </button>
+                  </div>
+                </section>
+              </aside>
+
+              <main class="space-y-6">
+                <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+                  <div class="mb-5 border-b border-slate-100 pb-4">
+                    <p class="text-sm font-medium text-blue-600">${escapeHtml(selected.name)}</p>
+                    <h2 class="mt-1 text-2xl font-semibold text-slate-900">AI 분석 결과</h2>
+                  </div>
+                  ${errorMessage ? `<div class="mb-5 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">${escapeHtml(errorMessage)}</div>` : ""}
+                  ${renderAnalysisCards()}
+                </section>
+
+                ${renderQuestionList()}
+
+                <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+                  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p class="text-sm font-medium text-slate-500">구조화면접 가이드 연결</p>
+                      <h2 class="mt-1 text-xl font-semibold text-slate-900">선택한 질문을 후보자 세션에 추가</h2>
+                      <p class="mt-2 text-sm leading-6 text-slate-500">후보자명, AI 브리프, 선택 질문이 저장되고 해당 후보자의 면접 페이지로 이동합니다.</p>
+                    </div>
+                    <button
+                      onclick="saveToGuide()"
+                      class="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600 disabled:opacity-50"
+                      ${!analysisResult ? "disabled" : ""}
+                    >
+                      구조화면접 가이드에 추가
+                    </button>
+                  </div>
+                </section>
+              </main>
+            </div>
+          </div>
+        `;
+      }
+
+      window.handlePdfUpload = handlePdfUpload;
+      window.analyzeResume = analyzeResume;
+      window.generateDemoAnalysis = generateDemoAnalysis;
+      window.toggleQuestion = toggleQuestion;
+      window.saveToGuide = saveToGuide;
+
+      render();
+    </script>
+  </body>
+</html>
