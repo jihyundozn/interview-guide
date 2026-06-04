@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html lang="ko">
   <head>
+    <script>
+      (function () {
+        const VERCEL_URL = "https://interview-guide-roan.vercel.app";
+        const isGithubPages = window.location.hostname.endsWith("github.io");
+
+        if (isGithubPages) {
+          let nextPath = window.location.pathname.replace(/^\/interview-guide\/?/, "/");
+          if (!nextPath || nextPath === "/index.html") nextPath = "/";
+
+          window.location.replace(
+            VERCEL_URL + nextPath + window.location.search + window.location.hash
+          );
+        }
+      })();
+    </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>더즌 구조화 면접 가이드</title>
