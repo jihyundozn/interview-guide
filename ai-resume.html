@@ -61,8 +61,6 @@
       let selectedPositionId = new URLSearchParams(window.location.search).get("positionId") || window.INTERVIEW_DATA.positions[0]?.id || "";
       let candidateName = "";
       let resumeText = "";
-      let apiKey = sessionStorage.getItem("dozn_openai_api_key") || "";
-      let modelName = sessionStorage.getItem("dozn_openai_model") || "gpt-4.1-mini";
       let isAnalyzing = false;
       let isPdfParsing = false;
       let errorMessage = "";
@@ -580,70 +578,45 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         return chunks.join("\n");
       }
 
+      function getExistingQuestionsForApi() {
+        const positionContext = getAnalysisPositionContext();
+        return positionContext.guide.standardQuestions.slice(0, 120).map((item) => ({
+          competency: item.competency,
+          question: item.question,
+        }));
+      }
+
       async function analyzeResume() {
-        if (!apiKey.trim()) {
-          alert("OpenAI API Key를 입력해주세요. 데모용으로 브라우저 세션에만 보관됩니다.");
-          return;
-        }
         if (!validateAnalysisInputs()) return;
 
         isAnalyzing = true;
         errorMessage = "";
         selectedQuestionIds = {};
-        sessionStorage.setItem("dozn_openai_api_key", apiKey.trim());
-        sessionStorage.setItem("dozn_openai_model", modelName.trim() || "gpt-4.1-mini");
         render();
 
         try {
-          const response = await fetch("https://api.openai.com/v1/responses", {
+          const response = await fetch("/api/analyze-resume", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey.trim()}`,
             },
             body: JSON.stringify({
-              model: modelName.trim() || "gpt-4.1-mini",
-              store: false,
-              input: [
-                {
-                  role: "system",
-                  content: [
-                    {
-                      type: "input_text",
-                      text: "당신은 채용담당자와 현업 면접관을 돕는 HR 어시스턴트입니다. 모든 응답은 한국어로 작성하고, 반드시 요청한 JSON 구조만 반환하세요.",
-                    },
-                  ],
-                },
-                {
-                  role: "user",
-                  content: [
-                    {
-                      type: "input_text",
-                      text: buildPrompt(),
-                    },
-                  ],
-                },
-              ],
-              text: {
-                format: {
-                  type: "json_schema",
-                  name: "resume_interview_analysis",
-                  strict: true,
-                  schema: getAnalysisSchema(),
-                },
-              },
+              positionContext: getAnalysisPositionContext(),
+              resumeText,
+              existingQuestions: getExistingQuestionsForApi(),
             }),
           });
 
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error?.message || "AI 분석 요청에 실패했습니다.");
+            throw new Error(data.error || "AI 분석 요청에 실패했습니다.");
           }
 
-          const outputText = extractOutputText(data);
-          if (!outputText) throw new Error("AI 응답에서 분석 결과를 찾지 못했습니다.");
+          if (!data.analysis) {
+            throw new Error("AI 응답에서 분석 결과를 찾지 못했습니다.");
+          }
 
-          analysisResult = normalizeAnalysis(JSON.parse(outputText));
+          analysisResult = normalizeAnalysis(data.analysis);
           analysisResult.questions.forEach((question) => {
             selectedQuestionIds[question.id] = true;
           });
@@ -1184,25 +1157,21 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
 
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <h2 class="text-xl font-semibold text-slate-900">AI 분석 실행</h2>
-                  <p class="mt-2 text-xs leading-5 text-slate-500">현재 데모 버전은 API Key를 브라우저 세션에만 저장합니다. 운영형 전환 후에는 이 입력칸을 제거하고 Vercel 서버에서 호출합니다.</p>
-
-                  <label class="mt-4 block text-sm font-semibold text-slate-700">
-                    OpenAI API Key
-                    <input type="password" class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none placeholder:text-slate-400" placeholder="sk-..." value="${escapeHtml(apiKey)}" oninput="apiKey = this.value" />
-                  </label>
-
-                  <label class="mt-4 block text-sm font-semibold text-slate-700">
-                    모델명
-                    <input class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none" value="${escapeHtml(modelName)}" oninput="modelName = this.value" />
-                  </label>
+                  <p class="mt-2 text-xs leading-5 text-slate-500">
+                    실제 AI 분석은 Vercel 서버리스 API를 통해 실행됩니다. OpenAI API Key는 화면에 입력하지 않고 Vercel 환경변수에 저장합니다.
+                  </p>
 
                   <div class="mt-5 grid gap-2">
                     <button onclick="analyzeResume()" class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)] transition hover:scale-[1.01] disabled:opacity-50" ${isAnalyzing || isPdfParsing || !contextReady ? "disabled" : ""}>
                       ${isAnalyzing ? "AI 분석 중..." : isPdfParsing ? "PDF 읽는 중..." : contextReady ? "AI 분석하기" : "기준 등록 후 분석 가능"}
                     </button>
                     <button onclick="generateDemoAnalysis()" class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50" ${!contextReady ? "disabled" : ""}>
-                      API 없이 임시 분석 생성
+                      화면 흐름 테스트용 임시 분석
                     </button>
+                  </div>
+
+                  <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
+                    실제 분석이 실패하면 Vercel 환경변수 <span class="font-semibold">OPENAI_API_KEY</span> 등록 여부와 재배포 여부를 확인해 주세요.
                   </div>
                 </section>
               </aside>
