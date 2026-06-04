@@ -105,14 +105,17 @@
       let showCautionModal = false;
       let showDraftModal = false;
       let showCustomQuestionModal = false;
+      let showCandidateModal = false;
       let isProgrammaticScroll = false;
       let showScrollTopButton = false;
 
+      let selectedCandidateId = "";
       let selectedScores = {};
-      let formStateByPosition = {};
+      let formStateBySession = {};
 
       const DRAFT_STORAGE_KEY = "dozn_interview_guide_drafts_v1";
-      const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v1";
+      const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v2";
+      const CANDIDATE_STORAGE_KEY = "dozn_interview_candidates_v1";
       const CUSTOM_SECTION_ID = "custom-job-questions";
       const CUSTOM_SECTION_NAME = "직무 추가 질문";
       const CUSTOM_QUESTION_TYPES = ["기술·지식 기반", "과거 경험 기반", "상황 가정형", "직무 가치관"];
@@ -128,6 +131,129 @@
           window.INTERVIEW_DATA.positions.find(
             (position) => position.id === selectedPositionId
           ) || window.INTERVIEW_DATA.positions[0]
+        );
+      }
+
+      function getSessionKey(positionId = selectedPositionId, candidateId = selectedCandidateId) {
+        return `${positionId}__${candidateId || "no_candidate"}`;
+      }
+
+      function getScorePrefix(positionId = selectedPositionId, candidateId = selectedCandidateId) {
+        return `${getSessionKey(positionId, candidateId)}__`;
+      }
+
+      function getDefaultAiBrief() {
+        return {
+          summary: "",
+          strengths: [],
+          concerns: [],
+          verificationPoints: [],
+        };
+      }
+
+      function getAllCandidates() {
+        try {
+          return JSON.parse(localStorage.getItem(CANDIDATE_STORAGE_KEY)) || {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function setAllCandidates(data) {
+        localStorage.setItem(CANDIDATE_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      function getCandidatesForPosition(positionId = selectedPositionId) {
+        const allCandidates = getAllCandidates();
+        return allCandidates[positionId] || [];
+      }
+
+      function setCandidatesForPosition(positionId, candidates) {
+        const allCandidates = getAllCandidates();
+        allCandidates[positionId] = candidates;
+        setAllCandidates(allCandidates);
+      }
+
+      function getSelectedCandidate() {
+        return getCandidatesForPosition(selectedPositionId).find(
+          (candidate) => candidate.id === selectedCandidateId
+        ) || null;
+      }
+
+      function normalizeCandidate(candidate) {
+        return {
+          id: candidate.id || `candidate_${Date.now()}`,
+          name: candidate.name || "이름 없는 후보자",
+          createdAt: candidate.createdAt || formatDraftDate(),
+          aiBrief: {
+            ...getDefaultAiBrief(),
+            ...(candidate.aiBrief || {}),
+          },
+        };
+      }
+
+      function createCandidate(positionId, name, aiBrief = getDefaultAiBrief()) {
+        const candidates = getCandidatesForPosition(positionId);
+        const newCandidate = normalizeCandidate({
+          id: `candidate_${Date.now()}`,
+          name: name.trim(),
+          createdAt: formatDraftDate(),
+          aiBrief,
+        });
+
+        candidates.unshift(newCandidate);
+        setCandidatesForPosition(positionId, candidates);
+        return newCandidate;
+      }
+
+      function openCandidateModal(positionId) {
+        selectedPositionId = positionId;
+        showCandidateModal = true;
+        render();
+      }
+
+      function closeCandidateModal() {
+        showCandidateModal = false;
+        render();
+      }
+
+      function openCandidateGuide(candidateId) {
+        selectedCandidateId = candidateId;
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+        currentPage = "guide";
+        showCandidateModal = false;
+        render();
+
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: "auto" });
+          handleScrollSpy();
+        }, 50);
+      }
+
+      function addCandidateDirectly() {
+        const name = prompt("후보자명을 입력해주세요.");
+        if (!name || !name.trim()) return;
+
+        const candidate = createCandidate(selectedPositionId, name);
+        openCandidateGuide(candidate.id);
+      }
+
+      function goAiResumeAnalysis() {
+        alert("AI 이력서 분석 페이지는 다음 단계에서 연결할 예정입니다. 우선 후보자별 면접 세션 구조부터 반영합니다.");
+      }
+
+      function getCurrentAiBrief() {
+        const candidate = getSelectedCandidate();
+        return candidate?.aiBrief || getDefaultAiBrief();
+      }
+
+      function hasAiBrief(brief = getCurrentAiBrief()) {
+        return Boolean(
+          brief.summary ||
+          brief.strengths?.length ||
+          brief.concerns?.length ||
+          brief.verificationPoints?.length
         );
       }
 
@@ -171,10 +297,16 @@
       }
 
       function getFormState() {
-        if (!formStateByPosition[selectedPositionId]) {
-          formStateByPosition[selectedPositionId] = getDefaultFormState();
+        const sessionKey = getSessionKey();
+        if (!formStateBySession[sessionKey]) {
+          const defaultState = getDefaultFormState();
+          const candidate = getSelectedCandidate();
+          if (candidate?.name) {
+            defaultState.candidateName = candidate.name;
+          }
+          formStateBySession[sessionKey] = defaultState;
         }
-        return formStateByPosition[selectedPositionId];
+        return formStateBySession[sessionKey];
       }
 
       function getQuestionMemo(sectionId, questionIndex) {
@@ -205,12 +337,12 @@
       }
 
       function getQuestionScore(sectionId, questionIndex) {
-        const key = `${selectedPositionId}__${sectionId}__${questionIndex}`;
+        const key = `${getScorePrefix()}${sectionId}__${questionIndex}`;
         return selectedScores[key] || null;
       }
 
       function setQuestionScore(sectionId, questionIndex, score) {
-        const key = `${selectedPositionId}__${sectionId}__${questionIndex}`;
+        const key = `${getScorePrefix()}${sectionId}__${questionIndex}`;
         selectedScores[key] = score;
         render();
       }
@@ -228,22 +360,11 @@
       }
 
       function setSelectedPosition(id) {
-        selectedPositionId = id;
-        const selected = getSelectedPosition();
-        activeNav = selected?.competencies?.[0]?.id || "final-review";
-        render();
+        openCandidateModal(id);
       }
 
       function startGuide() {
-        const selected = getSelectedPosition();
-        activeNav = selected?.competencies?.[0]?.id || "final-review";
-        currentPage = "guide";
-        render();
-
-        setTimeout(() => {
-          window.scrollTo({ top: 0, behavior: "auto" });
-          handleScrollSpy();
-        }, 50);
+        openCandidateModal(selectedPositionId);
       }
 
       function goLanding() {
@@ -252,6 +373,7 @@
         showCautionModal = false;
         showDraftModal = false;
         showCustomQuestionModal = false;
+        showCandidateModal = false;
         showScrollTopButton = false;
         render();
       }
@@ -356,12 +478,12 @@
 
       function getCurrentCustomQuestions() {
         const allCustomQuestions = getAllCustomQuestions();
-        return (allCustomQuestions[selectedPositionId] || []).map(normalizeCustomQuestion);
+        return (allCustomQuestions[getSessionKey()] || []).map(normalizeCustomQuestion);
       }
 
       function setCurrentCustomQuestions(questions) {
         const allCustomQuestions = getAllCustomQuestions();
-        allCustomQuestions[selectedPositionId] = questions.map(normalizeCustomQuestion);
+        allCustomQuestions[getSessionKey()] = questions.map(normalizeCustomQuestion);
         setAllCustomQuestions(allCustomQuestions);
       }
 
@@ -436,7 +558,7 @@
 
       function handleScrollSpy() {
         if (currentPage !== "guide") return;
-        if (showPdfPreview || showCautionModal || showDraftModal || showCustomQuestionModal) return;
+        if (showPdfPreview || showCautionModal || showDraftModal || showCustomQuestionModal || showCandidateModal) return;
         if (isProgrammaticScroll) return;
 
         const currentId = getCurrentVisibleSectionId();
@@ -517,8 +639,8 @@
         return `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
       }
 
-      function getCurrentPositionScores(positionId) {
-        const prefix = `${positionId}__`;
+      function getCurrentPositionScores(positionId, candidateId = selectedCandidateId) {
+        const prefix = getScorePrefix(positionId, candidateId);
         return Object.fromEntries(
           Object.entries(selectedScores).filter(([key]) => key.startsWith(prefix))
         );
@@ -540,13 +662,15 @@
           savedAt: formatDraftDate(),
           positionId: selectedPositionId,
           positionName: selected.name,
+          candidateId: selectedCandidateId,
           candidateName: form.candidateName.trim(),
+          aiBrief: JSON.parse(JSON.stringify(getCurrentAiBrief())),
           interviewer: form.interviewer || "",
           interviewDate: form.interviewDate || "",
           formState: JSON.parse(JSON.stringify(form)),
           customQuestions: JSON.parse(JSON.stringify(getCurrentCustomQuestions())),
           selectedScores: JSON.parse(
-            JSON.stringify(getCurrentPositionScores(selectedPositionId))
+            JSON.stringify(getCurrentPositionScores(selectedPositionId, selectedCandidateId))
           ),
         };
 
@@ -566,21 +690,23 @@
         }
 
         selectedPositionId = draft.positionId;
+        selectedCandidateId = draft.candidateId || selectedCandidateId || "";
         const selected = getSelectedPosition();
         activeNav = selected?.competencies?.[0]?.id || "final-review";
 
-        formStateByPosition[draft.positionId] = JSON.parse(
+        const sessionKey = getSessionKey(draft.positionId, selectedCandidateId);
+        formStateBySession[sessionKey] = JSON.parse(
           JSON.stringify(draft.formState || getDefaultFormState())
         );
 
         if (draft.customQuestions) {
           const allCustomQuestions = getAllCustomQuestions();
-          allCustomQuestions[draft.positionId] = draft.customQuestions;
+          allCustomQuestions[sessionKey] = draft.customQuestions;
           setAllCustomQuestions(allCustomQuestions);
         }
 
         Object.keys(selectedScores).forEach((key) => {
-          if (key.startsWith(`${draft.positionId}__`)) {
+          if (key.startsWith(getScorePrefix(draft.positionId, selectedCandidateId))) {
             delete selectedScores[key];
           }
         });
@@ -610,10 +736,14 @@
         const ok = confirm("현재 선택한 포지션의 작성 내용을 초기화할까요?");
         if (!ok) return;
 
-        formStateByPosition[selectedPositionId] = getDefaultFormState();
+        formStateBySession[getSessionKey()] = getDefaultFormState();
+        const candidate = getSelectedCandidate();
+        if (candidate?.name) {
+          formStateBySession[getSessionKey()].candidateName = candidate.name;
+        }
 
         Object.keys(selectedScores).forEach((key) => {
-          if (key.startsWith(`${selectedPositionId}__`)) {
+          if (key.startsWith(getScorePrefix())) {
             delete selectedScores[key];
           }
         });
@@ -646,12 +776,8 @@
                     .map(
                       (position) => `
                     <button
-                      onclick="setSelectedPosition('${position.id}')"
-                      class="rounded-2xl border px-4 py-4 text-base font-medium transition ${
-                        selectedPositionId === position.id
-                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/40"
-                      }"
+                      onclick="openCandidateModal('${position.id}')"
+                      class="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-base font-medium text-slate-700 transition hover:border-blue-200 hover:bg-blue-50/40 hover:text-blue-700"
                     >
                       ${position.name}
                     </button>
@@ -660,28 +786,77 @@
                     .join("")}
                 </div>
 
-                <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                  <p class="text-sm text-slate-500">현재 오픈 포지션 ${data.positions.length}개</p>
-
-                  <div class="flex flex-wrap gap-2">
-                    <a
-                      href="manual.html"
-                      class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
-                    >
-                      📘 면접 가이드 매뉴얼
-                    </a>
-
-                    <button
-                      onclick="startGuide()"
-                      class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.28)] transition hover:scale-[1.01]"
-                    >
-                      ${data.labels.startGuide}
-                    </button>
-                  </div>
+                <div class="mt-6 flex justify-center border-t border-slate-200 pt-5">
+                  <a
+                    href="manual.html"
+                    class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
+                  >
+                    📘 면접 가이드 매뉴얼
+                  </a>
                 </div>
               </div>
             </div>
           </div>
+        `;
+      }
+
+      function renderAiBriefPanel() {
+        const brief = getCurrentAiBrief();
+        const candidate = getSelectedCandidate();
+
+        const renderItems = (items, emptyText) => {
+          if (!items || !items.length) {
+            return `<p class="text-sm leading-6 text-slate-400">${emptyText}</p>`;
+          }
+
+          return `
+            <ul class="space-y-2 text-sm leading-6 text-slate-700">
+              ${items.map((item) => `<li class="rounded-2xl bg-white/75 px-3 py-2">• ${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          `;
+        };
+
+        return `
+          <section class="mb-8 rounded-[30px] border border-blue-100 bg-white/88 p-5 shadow-sm backdrop-blur md:p-6">
+            <div class="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <p class="text-sm font-medium text-blue-600">AI 이력서 분석 브리프</p>
+                <h3 class="mt-1 text-2xl font-semibold text-slate-900">
+                  ${candidate ? `${escapeHtml(candidate.name)} 후보자 사전 검토 요약` : "후보자 사전 검토 요약"}
+                </h3>
+                <p class="mt-2 text-sm leading-6 text-slate-500">
+                  이력서 기반 참고 자료입니다. 최종 평가는 면접 답변과 평가 기준에 따라 작성해주세요.
+                </p>
+              </div>
+              <span class="rounded-full ${hasAiBrief(brief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
+                ${hasAiBrief(brief) ? "AI 분석 결과 있음" : "AI 분석 결과 없음"}
+              </span>
+            </div>
+
+            <div class="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr_1fr]">
+              <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                <p class="mb-3 text-sm font-semibold text-slate-900">지원자 요약</p>
+                <p class="text-sm leading-7 text-slate-700">
+                  ${brief.summary ? nl2br(brief.summary) : "AI 이력서 분석 페이지에서 후보자를 등록하면 이 영역에 지원자 요약이 표시됩니다."}
+                </p>
+              </div>
+
+              <div class="rounded-3xl border border-emerald-100 bg-emerald-50/50 p-4">
+                <p class="mb-3 text-sm font-semibold text-emerald-900">강점</p>
+                ${renderItems(brief.strengths, "등록된 강점 없음")}
+              </div>
+
+              <div class="rounded-3xl border border-rose-100 bg-rose-50/50 p-4">
+                <p class="mb-3 text-sm font-semibold text-rose-900">우려사항</p>
+                ${renderItems(brief.concerns, "등록된 우려사항 없음")}
+              </div>
+
+              <div class="rounded-3xl border border-amber-100 bg-amber-50/50 p-4">
+                <p class="mb-3 text-sm font-semibold text-amber-900">검증 포인트</p>
+                ${renderItems(brief.verificationPoints, "등록된 검증 포인트 없음")}
+              </div>
+            </div>
+          </section>
         `;
       }
 
@@ -693,19 +868,20 @@
         const customQuestions = getCurrentCustomQuestions();
         const form = getFormState();
         const currentFinalDecision = getFinalDecision();
+        const candidate = getSelectedCandidate();
 
         return `
           <div class="relative mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-14">
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div class="mb-2 inline-flex items-center rounded-full border border-white/70 bg-white/70 px-3 py-1 text-xs font-medium text-slate-500 backdrop-blur">
-                  선택 포지션 · ${selected.name}
+                  선택 포지션 · ${selected.name}${candidate ? ` · 후보자 ${escapeHtml(candidate.name)}` : ""}
                 </div>
                 <h2 class="text-3xl font-semibold tracking-tight text-slate-900">
                   ${selected.guideTitle || `${selected.name} 구조화 면접 가이드`}
                 </h2>
                 <p class="mt-2 text-sm leading-6 text-slate-600">
-                  ${selected.summary || ""}
+                  ${candidate ? `현재 ${escapeHtml(candidate.name)} 후보자의 면접 세션을 작성 중입니다.` : selected.summary || ""}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">
@@ -713,7 +889,7 @@
                   onclick="goLanding()"
                   class="rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur"
                 >
-                  ← 포지션 다시 선택
+                  ← 포지션 선택으로
                 </button>
                 <button
                   onclick="openDraftModal()"
@@ -729,6 +905,8 @@
                 </button>
               </div>
             </div>
+
+            ${renderAiBriefPanel()}
 
             <div class="mb-8 grid gap-4 lg:grid-cols-3">
               <div class="rounded-3xl border border-white/70 bg-white/78 p-5 shadow-sm backdrop-blur">
@@ -1387,7 +1565,21 @@ function renderPdfPreview() {
                       <p>${escapeHtml(form.interviewDate || selected.pdfPreview?.interviewDate || "-")}</p>
                     </div>
                   </div>
+                ${
+                  hasAiBrief()
+                    ? `
+                <div class="mt-6 rounded-3xl border border-blue-100 bg-blue-50/40 p-5">
+                  <p class="text-lg font-semibold text-slate-900">AI 이력서 분석 브리프</p>
+                  <div class="mt-3 text-sm leading-7 text-slate-700">
+                    <p><span class="font-semibold text-slate-900">지원자 요약</span> : ${nl2br(getCurrentAiBrief().summary || "-")}</p>
+                    <p class="mt-2"><span class="font-semibold text-slate-900">강점</span> : ${(getCurrentAiBrief().strengths || []).map(escapeHtml).join(" / ") || "-"}</p>
+                    <p class="mt-2"><span class="font-semibold text-slate-900">우려사항</span> : ${(getCurrentAiBrief().concerns || []).map(escapeHtml).join(" / ") || "-"}</p>
+                    <p class="mt-2"><span class="font-semibold text-slate-900">검증 포인트</span> : ${(getCurrentAiBrief().verificationPoints || []).map(escapeHtml).join(" / ") || "-"}</p>
+                  </div>
                 </div>
+                `
+                    : ""
+                }
 
                 <div class="mt-6 space-y-5">
                   ${competencies
@@ -1664,6 +1856,84 @@ function renderPdfPreview() {
         `;
       }
 
+      function renderCandidateModal() {
+        if (!showCandidateModal) return "";
+
+        const selected = getSelectedPosition();
+        const candidates = getCandidatesForPosition(selectedPositionId);
+
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8 backdrop-blur-sm">
+            <div class="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-[32px] bg-white p-6 shadow-2xl md:p-8">
+              <div class="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <p class="text-sm font-medium text-blue-600">후보자 선택</p>
+                  <h3 class="mt-1 text-2xl font-semibold text-slate-900">${selected.name}</h3>
+                  <p class="mt-2 text-sm leading-6 text-slate-500">
+                    랜딩페이지에는 후보자명을 노출하지 않고, 포지션 안에서만 후보자별 면접 세션을 관리합니다.
+                  </p>
+                </div>
+                <button
+                  onclick="closeCandidateModal()"
+                  class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
+                >
+                  닫기
+                </button>
+              </div>
+
+              <div class="space-y-3">
+                ${
+                  !candidates.length
+                    ? `
+                  <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+                    <p class="text-sm font-semibold text-slate-700">아직 등록된 후보자가 없습니다.</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">
+                      후보자를 직접 추가하거나, 다음 단계에서 AI 이력서 분석 페이지를 통해 후보자를 등록할 수 있습니다.
+                    </p>
+                  </div>
+                `
+                    : candidates
+                        .map(
+                          (candidate) => `
+                    <button
+                      onclick="openCandidateGuide('${candidate.id}')"
+                      class="w-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40"
+                    >
+                      <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p class="text-lg font-semibold text-slate-900">${escapeHtml(candidate.name)}</p>
+                          <p class="mt-1 text-sm text-slate-500">생성일: ${escapeHtml(candidate.createdAt || "-")}</p>
+                        </div>
+                        <span class="rounded-full ${hasAiBrief(candidate.aiBrief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
+                          ${hasAiBrief(candidate.aiBrief) ? "AI 브리프 있음" : "AI 브리프 없음"}
+                        </span>
+                      </div>
+                    </button>
+                  `
+                        )
+                        .join("")
+                }
+              </div>
+
+              <div class="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2">
+                <button
+                  onclick="addCandidateDirectly()"
+                  class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
+                >
+                  + 후보자 직접 추가
+                </button>
+                <button
+                  onclick="goAiResumeAnalysis()"
+                  class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
+                >
+                  AI 이력서 분석으로 후보자 추가
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
       function renderScrollTopButton() {
         if (
           currentPage !== "guide" ||
@@ -1671,7 +1941,8 @@ function renderPdfPreview() {
           showPdfPreview ||
           showCautionModal ||
           showDraftModal ||
-          showCustomQuestionModal
+          showCustomQuestionModal ||
+          showCandidateModal
         ) {
           return "";
         }
@@ -1725,12 +1996,18 @@ function renderPdfPreview() {
           ${renderPdfPreview()}
           ${renderCustomQuestionModal()}
           ${renderDraftModal()}
+          ${renderCandidateModal()}
           ${renderScrollTopButton()}
         `;
       }
 
       window.setSelectedPosition = setSelectedPosition;
       window.startGuide = startGuide;
+      window.openCandidateModal = openCandidateModal;
+      window.closeCandidateModal = closeCandidateModal;
+      window.openCandidateGuide = openCandidateGuide;
+      window.addCandidateDirectly = addCandidateDirectly;
+      window.goAiResumeAnalysis = goAiResumeAnalysis;
       window.goLanding = goLanding;
       window.scrollToSection = scrollToSection;
       window.scrollToTop = scrollToTop;
@@ -1772,7 +2049,8 @@ function renderPdfPreview() {
             !showPdfPreview &&
             !showCautionModal &&
             !showDraftModal &&
-            !showCustomQuestionModal;
+            !showCustomQuestionModal &&
+            !showCandidateModal;
 
           if (shouldShow !== showScrollTopButton) {
             showScrollTopButton = shouldShow;
