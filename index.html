@@ -301,7 +301,7 @@
       }
 
       function goAiResumeAnalysis() {
-        alert("AI 이력서 분석 페이지는 다음 단계에서 연결할 예정입니다. 우선 후보자별 면접 세션 구조부터 반영합니다.");
+        window.location.href = `ai-resume.html?positionId=${encodeURIComponent(selectedPositionId)}`;
       }
 
       function getCurrentAiBrief() {
@@ -2114,6 +2114,34 @@ function renderPdfPreview() {
         html2pdf().set(opt).from(element).save();
       }
 
+      function initializeFromUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const positionId = params.get("positionId");
+        const candidateId = params.get("candidateId");
+
+        if (!positionId || !candidateId) return;
+
+        const positionExists = window.INTERVIEW_DATA.positions.some(
+          (position) => position.id === positionId
+        );
+
+        if (!positionExists) return;
+
+        selectedPositionId = positionId;
+        const candidateExists = getCandidatesForPosition(positionId).some(
+          (candidate) => candidate.id === candidateId
+        );
+
+        if (!candidateExists) return;
+
+        selectedCandidateId = candidateId;
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+        currentPage = "guide";
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       function render() {
         app.innerHTML = `
           ${currentPage === "landing" ? renderLanding() : renderGuide()}
@@ -2162,6 +2190,7 @@ function renderPdfPreview() {
       window.deleteDraft = deleteDraft;
       window.resetCurrentEvaluation = resetCurrentEvaluation;
 
+      initializeFromUrlParams();
       render();
 
       let scrollSpyTicking = false;
