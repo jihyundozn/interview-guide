@@ -69,6 +69,9 @@
       let selectedQuestionIds = {};
       let analysisResult = null;
       let contextDraft = null;
+      let currentAnalysisHistoryId = "";
+      let isPositionContextOpen = false;
+      let isHrEditMode = false;
 
       function getSelectedPosition() {
         return window.INTERVIEW_DATA.positions.find((position) => position.id === selectedPositionId) || window.INTERVIEW_DATA.positions[0];
@@ -284,11 +287,30 @@
           candidateName: candidateName.trim(),
           analysisResult: JSON.parse(JSON.stringify(analysisResult)),
           selectedQuestionIds: JSON.parse(JSON.stringify(selectedQuestionIds || {})),
+          addedToGuide: false,
+          addedAt: "",
+          candidateId: "",
         };
 
         const history = getAnalysisHistory();
         history.unshift(snapshot);
         setAnalysisHistory(history.slice(0, 50));
+        currentAnalysisHistoryId = snapshot.id;
+      }
+
+      function markCurrentAnalysisAddedToGuide(candidateId) {
+        if (!currentAnalysisHistoryId) return;
+        const history = getAnalysisHistory();
+        const updated = history.map((item) => {
+          if (item.id !== currentAnalysisHistoryId) return item;
+          return {
+            ...item,
+            addedToGuide: true,
+            addedAt: formatDate(),
+            candidateId,
+          };
+        });
+        setAnalysisHistory(updated);
       }
 
       function loadAnalysisHistory(historyId) {
@@ -303,6 +325,7 @@
         candidateName = item.candidateName || "";
         analysisResult = item.analysisResult ? normalizeAnalysis(item.analysisResult) : null;
         selectedQuestionIds = item.selectedQuestionIds || {};
+        currentAnalysisHistoryId = item.id;
         resumeText = "";
         errorMessage = "";
         contextDraft = null;
@@ -393,7 +416,7 @@
 
             <h2>지원자 요약</h2>
             <div class="summary small-break">
-              <div class="score">${result.overallFitScore || "-"} / 100 종합 적합도</div>
+              <div class="score">AI 참고 점수 ${result.overallFitScore || "-"} / 100</div>
               <p>${nl2br(result.summary || "내용 없음")}</p>
             </div>
 
@@ -1081,11 +1104,19 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
 
         const allCandidates = getAllCandidates();
         const candidates = allCandidates[selectedPositionId] || [];
-        const candidateId = `candidate_${Date.now()}`;
+        const existingCandidate = candidates.find((candidate) => (candidate.name || "").trim() === name);
+        let candidateId = existingCandidate?.id || `candidate_${Date.now()}`;
+
+        if (existingCandidate) {
+          const ok = confirm("이미 동일한 후보자명이 등록되어 있습니다. 기존 후보자 세션의 AI 브리프와 추천 질문을 업데이트할까요?");
+          if (!ok) return;
+        }
+
         const newCandidate = {
           id: candidateId,
           name,
-          createdAt: formatDate(),
+          createdAt: existingCandidate?.createdAt || formatDate(),
+          updatedAt: formatDate(),
           aiBrief: {
             overallFitScore: analysisResult.overallFitScore,
             summary: analysisResult.summary,
@@ -1096,8 +1127,10 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           },
         };
 
-        candidates.unshift(newCandidate);
-        allCandidates[selectedPositionId] = candidates;
+        const nextCandidates = existingCandidate
+          ? candidates.map((candidate) => candidate.id === candidateId ? newCandidate : candidate)
+          : [newCandidate, ...candidates];
+        allCandidates[selectedPositionId] = nextCandidates;
         setAllCandidates(allCandidates);
 
         const sessionKey = `${selectedPositionId}__${candidateId}`;
@@ -1114,8 +1147,28 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           rubric: question.rubric || getQuestionRubric(),
         }));
         setAllCustomQuestions(allCustomQuestions);
+        markCurrentAnalysisAddedToGuide(candidateId);
 
         window.location.href = `index.html?positionId=${encodeURIComponent(selectedPositionId)}&candidateId=${encodeURIComponent(candidateId)}`;
+      }
+
+      function togglePositionContextOpen() {
+        isPositionContextOpen = !isPositionContextOpen;
+        render();
+      }
+
+      function enableHrEditMode() {
+        const ok = confirm("포지션 분석 기준은 HR에서 관리하는 항목입니다. 수정 모드로 전환하시겠습니까?");
+        if (!ok) return;
+        isPositionContextOpen = true;
+        isHrEditMode = true;
+        render();
+      }
+
+      function cancelHrEditMode() {
+        contextDraft = null;
+        isHrEditMode = false;
+        render();
       }
 
       function renderPositionContextCard() {
@@ -1123,72 +1176,109 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         const draft = getContextDraft();
         const stored = getStoredPositionContext(selectedPositionId);
         const isSaved = hasRequiredPositionContext();
+        const displayContext = {
+          ...getDefaultContext(selected),
+          ...(stored || {}),
+        };
+        if (!displayContext.keyTasks && displayContext.jd) displayContext.keyTasks = displayContext.jd;
+
+        const renderReadOnlyBlock = (label, value, required = false) => `
+          <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <p class="text-xs font-semibold text-slate-500">${label}${required ? " *" : ""}</p>
+            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">${escapeHtml(value || "등록된 내용 없음")}</p>
+          </div>
+        `;
 
         return `
           <section class="rounded-[32px] border ${isSaved ? "border-blue-100" : "border-amber-200"} bg-white/85 p-6 shadow-sm backdrop-blur">
-            <div class="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+            <div class="flex items-start justify-between gap-3 ${isPositionContextOpen ? "border-b border-slate-100 pb-4" : ""}">
               <div>
                 <p class="text-sm font-medium ${isSaved ? "text-blue-600" : "text-amber-700"}">포지션 분석 기준</p>
-                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준 등록</h2>
+                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준</h2>
                 <p class="mt-2 text-xs leading-5 text-slate-500">
                   AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 등록 예정으로, 개별적으로 등록하거나, 임의로 수정하지 말아주세요.
                 </p>
               </div>
-              <span class="shrink-0 rounded-full ${isSaved ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
-                ${isSaved ? "등록됨" : "분석 기준 등록 필요"}
-              </span>
+              <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <span class="rounded-full ${isSaved ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
+                  ${isSaved ? "등록됨" : "분석 기준 등록 필요"}
+                </span>
+                <button onclick="togglePositionContextOpen()" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                  ${isPositionContextOpen ? "접기" : "보기"}
+                </button>
+              </div>
             </div>
 
-            <label class="block text-sm font-semibold text-slate-700">
-              주요업무 <span class="text-rose-500">*</span>
-              <textarea
-                class="mt-2 h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
-                placeholder="예: 채용 운영 / 후보자 커뮤니케이션 / Direct Sourcing"
-                oninput="updateContextField('keyTasks', this.value)"
-              >${escapeHtml(draft.keyTasks)}</textarea>
-            </label>
+            ${!isPositionContextOpen ? "" : `
+              ${!isHrEditMode ? `
+                <div class="mt-5 grid gap-3">
+                  ${renderReadOnlyBlock("주요업무", displayContext.keyTasks, true)}
+                  ${renderReadOnlyBlock("필수자격 / 필요경험", displayContext.requiredQualifications)}
+                  ${renderReadOnlyBlock("우대사항", displayContext.preferredQualifications)}
+                  ${renderReadOnlyBlock("핵심역량", displayContext.coreCompetencies)}
+                </div>
+                ${stored?.updatedAt ? `<p class="mt-3 text-xs text-slate-400">마지막 저장: ${escapeHtml(stored.updatedAt)}</p>` : ""}
+                <div class="mt-5 flex justify-end">
+                  <button onclick="enableHrEditMode()" class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100">
+                    HR 수정 모드
+                  </button>
+                </div>
+              ` : `
+                <div class="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                  HR 수정 모드입니다. 수정 후 반드시 저장해 주세요.
+                </div>
 
-            <label class="mt-4 block text-sm font-semibold text-slate-700">
-              필수자격 / 필요경험
-              <textarea
-                class="mt-2 h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
-                placeholder="예: 채용 운영 3년 이상 / 현업 커뮤니케이션 경험"
-                oninput="updateContextField('requiredQualifications', this.value)"
-              >${escapeHtml(draft.requiredQualifications)}</textarea>
-            </label>
+                <label class="mt-5 block text-sm font-semibold text-slate-700">
+                  주요업무 <span class="text-rose-500">*</span>
+                  <textarea
+                    class="mt-2 h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
+                    placeholder="예: 채용 운영 / 후보자 커뮤니케이션 / Direct Sourcing"
+                    oninput="updateContextField('keyTasks', this.value)"
+                  >${escapeHtml(draft.keyTasks)}</textarea>
+                </label>
 
-            <label class="mt-4 block text-sm font-semibold text-slate-700">
-              우대사항
-              <textarea
-                class="mt-2 h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
-                placeholder="예: ATS 운영 경험 / 채용 브랜딩 콘텐츠 제작 경험"
-                oninput="updateContextField('preferredQualifications', this.value)"
-              >${escapeHtml(draft.preferredQualifications)}</textarea>
-            </label>
+                <label class="mt-4 block text-sm font-semibold text-slate-700">
+                  필수자격 / 필요경험
+                  <textarea
+                    class="mt-2 h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
+                    placeholder="예: 채용 운영 3년 이상 / 현업 커뮤니케이션 경험"
+                    oninput="updateContextField('requiredQualifications', this.value)"
+                  >${escapeHtml(draft.requiredQualifications)}</textarea>
+                </label>
 
-            <label class="mt-4 block text-sm font-semibold text-slate-700">
-              핵심역량
-              <textarea
-                class="mt-2 h-20 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
-                placeholder="예: 문제해결력, 협업·커뮤니케이션, 업무효율·실행력"
-                oninput="updateContextField('coreCompetencies', this.value)"
-              >${escapeHtml(draft.coreCompetencies)}</textarea>
-            </label>
+                <label class="mt-4 block text-sm font-semibold text-slate-700">
+                  우대사항
+                  <textarea
+                    class="mt-2 h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
+                    placeholder="예: ATS 운영 경험 / 채용 브랜딩 콘텐츠 제작 경험"
+                    oninput="updateContextField('preferredQualifications', this.value)"
+                  >${escapeHtml(draft.preferredQualifications)}</textarea>
+                </label>
 
-            ${stored?.updatedAt ? `<p class="mt-3 text-xs text-slate-400">마지막 저장: ${escapeHtml(stored.updatedAt)}</p>` : ""}
+                <label class="mt-4 block text-sm font-semibold text-slate-700">
+                  핵심역량
+                  <textarea
+                    class="mt-2 h-20 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
+                    placeholder="예: 문제해결력, 협업·커뮤니케이션, 업무효율·실행력"
+                    oninput="updateContextField('coreCompetencies', this.value)"
+                  >${escapeHtml(draft.coreCompetencies)}</textarea>
+                </label>
 
-            <div class="mt-5 grid gap-2 sm:grid-cols-2">
-              <button onclick="savePositionContext()" class="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                포지션 분석 기준 저장
-              </button>
-              <button onclick="resetPositionContextDraft()" class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
-                입력 내용 되돌리기
-              </button>
-            </div>
+                ${stored?.updatedAt ? `<p class="mt-3 text-xs text-slate-400">마지막 저장: ${escapeHtml(stored.updatedAt)}</p>` : ""}
+
+                <div class="mt-5 grid gap-2 sm:grid-cols-2">
+                  <button onclick="savePositionContext()" class="rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                    포지션 분석 기준 저장
+                  </button>
+                  <button onclick="cancelHrEditMode()" class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                    수정 취소
+                  </button>
+                </div>
+              `}
+            `}
           </section>
         `;
       }
-
 
       function renderAnalysisHistoryPanel() {
         const history = getAnalysisHistory().filter((item) => item.positionId === selectedPositionId);
@@ -1210,18 +1300,30 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
               </div>
             ` : `
               <div class="space-y-2">
-                ${history.slice(0, 8).map((item) => `
-                  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <button onclick="loadAnalysisHistory('${item.id}')" class="w-full text-left">
-                      <p class="text-sm font-semibold text-slate-900">${escapeHtml(item.candidateName || "후보자명 미입력")}</p>
-                      <p class="mt-1 text-xs text-slate-500">${escapeHtml(item.savedAt || "-")} · 적합도 ${escapeHtml(item.analysisResult?.overallFitScore || "-")}/100</p>
-                    </button>
-                    <div class="mt-3 flex gap-2">
-                      <button onclick="loadAnalysisHistory('${item.id}')" class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">불러오기</button>
-                      <button onclick="deleteAnalysisHistory('${item.id}', event)" class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600">삭제</button>
+                ${history.slice(0, 8).map((item) => {
+                  const added = Boolean(item.addedToGuide);
+                  return `
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <button onclick="loadAnalysisHistory('${item.id}')" class="w-full text-left">
+                        <p class="text-sm font-semibold text-slate-900">
+                          ${escapeHtml(item.candidateName || "후보자명 미입력")} / ${escapeHtml(item.positionName || selected?.name || "포지션")} / ${escapeHtml(item.savedAt || "-")}
+                        </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                          <span class="rounded-full ${added ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"} px-3 py-1 text-xs font-semibold">
+                            상태: ${added ? "후보자 세션 추가 완료" : "후보자 세션 미추가"}
+                          </span>
+                          <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+                            AI 참고 점수 ${escapeHtml(item.analysisResult?.overallFitScore || "-")}/100
+                          </span>
+                        </div>
+                      </button>
+                      <div class="mt-3 flex gap-2">
+                        <button onclick="loadAnalysisHistory('${item.id}')" class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">불러오기</button>
+                        <button onclick="deleteAnalysisHistory('${item.id}', event)" class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600">삭제</button>
+                      </div>
                     </div>
-                  </div>
-                `).join("")}
+                  `;
+                }).join("")}
               </div>
             `}
           </section>
@@ -1264,7 +1366,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             <div class="rounded-[28px] border border-blue-100 bg-white/90 p-5">
               <div class="mb-3 flex flex-wrap items-center gap-3">
                 <p class="text-sm font-semibold text-blue-700">지원자 요약</p>
-                <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">${analysisResult.overallFitScore || "-"}<span class="ml-0.5 text-xs font-semibold text-blue-500">/100</span> 종합 적합도</span>
+                <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">AI 참고 점수 ${analysisResult.overallFitScore || "-"}<span class="ml-0.5 text-xs font-semibold text-blue-500">/100</span></span>
               </div>
               <p class="text-sm leading-7 text-slate-700">${nl2br(analysisResult.summary)}</p>
             </div>
@@ -1353,6 +1455,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         selectedQuestionIds = {};
         errorMessage = "";
         contextDraft = null;
+        currentAnalysisHistoryId = "";
+        isPositionContextOpen = false;
+        isHrEditMode = false;
         render();
       }
 
@@ -1488,6 +1593,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
       window.downloadAnalysisPdf = downloadAnalysisPdf;
       window.loadAnalysisHistory = loadAnalysisHistory;
       window.deleteAnalysisHistory = deleteAnalysisHistory;
+      window.togglePositionContextOpen = togglePositionContextOpen;
+      window.enableHrEditMode = enableHrEditMode;
+      window.cancelHrEditMode = cancelHrEditMode;
       window.updateContextField = updateContextField;
       window.savePositionContext = savePositionContext;
       window.resetPositionContextDraft = resetPositionContextDraft;
