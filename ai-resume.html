@@ -1233,7 +1233,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           return `
             <div class="rounded-[28px] border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
               <p class="text-sm font-semibold text-slate-700">아직 분석 결과가 없습니다.</p>
-              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면<br>지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
+              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면 지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
             </div>
           `;
         }
@@ -1420,7 +1420,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <h2 class="text-xl font-semibold text-slate-900">이력서 AI 분석</h2>
                   <p class="mt-2 text-xs leading-5 text-slate-500">
-                    분석 횟수에 따라 토큰이 차감됩니다. 무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
+                    <span class="font-semibold text-slate-800">분석 횟수에 따라 토큰이 차감됩니다.</span> 무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
                   </p>
 
                   <div class="mt-5 grid gap-2">
@@ -1429,12 +1429,10 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                     </button>
                   </div>
 
-                  <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
-                    오류 발생 시 HR팀 오지현 매니저에게 문의 바랍니다.
-                  </div>
+                  <p class="mt-4 text-xs leading-5 text-slate-500">
+                    🚨 오류 발생 시 HR팀 오지현 매니저에게 문의 바랍니다.
+                  </p>
                 </section>
-
-                ${renderAnalysisHistoryPanel()}
               </aside>
 
               <main class="space-y-6">
@@ -1459,13 +1457,12 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 ${renderQuestionList()}
 
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
-                  <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p class="text-sm font-medium text-slate-500">구조화면접 가이드 연결</p>
-                      <h2 class="mt-1 text-xl font-semibold text-slate-900">선택한 질문을 후보자 세션에 추가</h2>
-                      <p class="mt-2 text-sm leading-6 text-slate-500">후보자명, AI 브리프, 선택 질문이 저장되고 해당 후보자의 면접 페이지로 이동합니다.</p>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
+                  <div>
+                    <p class="text-sm font-medium text-slate-500">구조화면접 가이드 연결</p>
+                    <h2 class="mt-1 text-xl font-semibold text-slate-900">선택한 질문을 후보자 세션에 추가</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">후보자명, AI 브리프, 선택 질문이 저장되고 해당 후보자의 면접 페이지로 이동합니다.</p>
+
+                    <div class="mt-5 flex flex-col gap-2 sm:flex-row">
                       <button onclick="downloadAnalysisPdf()" class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100 disabled:opacity-50" ${!analysisResult ? "disabled" : ""}>
                         PDF 저장
                       </button>
@@ -1475,6 +1472,8 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                     </div>
                   </div>
                 </section>
+
+                ${renderAnalysisHistoryPanel()}
               </main>
             </div>
           </div>
