@@ -93,20 +93,19 @@
 
     <div id="app" class="app-shell"></div>
 
-<script src="interview-data.js"></script>
-<script>
-  const VERCEL_APP_URL = "https://interview-guide-roan.vercel.app";
+    <script src="interview-data.js"></script>
+    <script>
+      const VERCEL_APP_URL = "https://interview-guide-roan.vercel.app";
 
-  if (window.location.hostname.includes("github.io")) {
-    const currentPath = window.location.pathname || "/";
-    const currentSearch = window.location.search || "";
-    const currentHash = window.location.hash || "";
+      if (window.location.hostname.includes("github.io")) {
+        const currentPath = window.location.pathname || "/";
+        const currentSearch = window.location.search || "";
+        const currentHash = window.location.hash || "";
+        const normalizedPath = currentPath.replace(/^\/interview-guide/, "") || "/";
+        window.location.replace(`${VERCEL_APP_URL}${normalizedPath}${currentSearch}${currentHash}`);
+      }
 
-    const normalizedPath = currentPath.replace(/^\/interview-guide/, "") || "/";
-    window.location.replace(`${VERCEL_APP_URL}${normalizedPath}${currentSearch}${currentHash}`);
-  }
-
-  const app = document.getElementById("app");
+      const app = document.getElementById("app");
 
       let currentPage = "landing";
       let selectedPositionId = window.INTERVIEW_DATA.positions[0]?.id || "";
@@ -121,6 +120,7 @@
       let isProgrammaticScroll = false;
       let showScrollTopButton = false;
       let openJdFitEvidence = {};
+      let isAiBriefCollapsed = false;
 
       let selectedCandidateId = "";
       let newCandidateName = "";
@@ -131,7 +131,7 @@
       const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v2";
       const CANDIDATE_STORAGE_KEY = "dozn_interview_candidates_v1";
       const CUSTOM_SECTION_ID = "custom-job-questions";
-      const CUSTOM_SECTION_NAME = "직무 추가 질문";
+      const CUSTOM_SECTION_NAME = "AI 추천 질문";
       const CUSTOM_QUESTION_TYPES = ["기술·지식 기반", "과거 경험 기반", "상황 가정형", "직무 가치관"];
 
       let customQuestionForm = {
@@ -731,6 +731,11 @@
         render();
       }
 
+      function toggleAiBriefCollapsed() {
+        isAiBriefCollapsed = !isAiBriefCollapsed;
+        render();
+      }
+
       function isAiRecommendedQuestion(question) {
         return Boolean(
           question?.id?.startsWith("ai_custom") ||
@@ -989,27 +994,38 @@
 
         return `
           <section class="mb-8 rounded-[30px] border border-blue-100 bg-white/88 p-5 shadow-sm backdrop-blur md:p-6">
-            <div class="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+            <div class="flex flex-wrap items-start justify-between gap-3 ${isAiBriefCollapsed ? "" : "border-b border-slate-100 pb-4"}">
               <div>
                 <p class="text-sm font-medium text-blue-600">AI 이력서 분석 브리프</p>
                 <h3 class="mt-1 text-2xl font-semibold text-slate-900">
                   ${candidate ? `${escapeHtml(candidate.name)} 후보자 사전 검토 요약` : "후보자 사전 검토 요약"}
                 </h3>
-                <p class="mt-2 text-sm leading-6 text-slate-500">
-                  이력서 기반 참고 자료입니다. 최종 평가는 면접 답변과 평가 기준에 따라 작성해주세요.
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+                  <span class="font-semibold text-slate-700">AI 분석 브리프는 이력서 기반 사전 검토 자료입니다.</span><br class="hidden sm:block">
+                  최종 평가는 면접 답변과 평가 기준에 따라 작성해 주세요.
                 </p>
               </div>
-              <span class="rounded-full ${hasAiBrief(brief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
-                ${hasAiBrief(brief) ? "AI 분석 결과 있음" : "AI 분석 결과 없음"}
-              </span>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full ${hasAiBrief(brief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
+                  ${hasAiBrief(brief) ? "AI 분석 결과 있음" : "AI 분석 결과 없음"}
+                </span>
+                <button
+                  type="button"
+                  onclick="toggleAiBriefCollapsed()"
+                  class="rounded-full border border-blue-100 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+                >
+                  ${isAiBriefCollapsed ? "브리프 펼치기" : "브리프 접기"}
+                </button>
+              </div>
             </div>
 
-            <div class="grid gap-4">
+            ${isAiBriefCollapsed ? "" : `
+            <div class="mt-5 grid gap-4">
               <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
                 <div class="mb-3 flex flex-wrap items-center gap-3">
                   <p class="text-sm font-semibold text-slate-900">지원자 요약</p>
                   <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">
-                    ${brief.overallFitScore || "-"}<span class="ml-0.5 text-xs font-semibold text-blue-500">/100</span> 종합 적합도
+                    AI 참고 점수 ${brief.overallFitScore || "-"}<span class="ml-0.5 text-xs font-semibold text-blue-500">/100</span>
                   </span>
                 </div>
                 <p class="text-sm leading-7 text-slate-700">
@@ -1029,6 +1045,7 @@
                 </div>
               </div>
             </div>
+            `}
           </section>
         `;
       }
@@ -1043,11 +1060,11 @@
         const candidate = getSelectedCandidate();
         const aiQuestionCount = customQuestions.filter(isAiRecommendedQuestion).length;
         const directQuestionCount = customQuestions.length - aiQuestionCount;
-        const customSectionEyebrow = aiQuestionCount && !directQuestionCount ? "AI 추천 질문" : aiQuestionCount ? "AI 추천 질문 · 면접관 직접 등록" : "면접관 직접 등록";
-        const customSectionTitle = aiQuestionCount && !directQuestionCount ? "AI 이력서 기반 후보자 맞춤 질문" : "직무 전문성/직무역량 추가 질문";
-        const customSectionDescription = aiQuestionCount && !directQuestionCount
+        const customSectionEyebrow = "AI 추천 질문";
+        const customSectionTitle = "AI 이력서 기반 후보자 맞춤 질문";
+        const customSectionDescription = aiQuestionCount
           ? "AI 이력서 분석 결과를 바탕으로 선택한 후보자 맞춤 질문입니다."
-          : "매뉴얼을 참고해 면접 전 질문을 미리 등록합니다.";
+          : "AI 이력서 분석 페이지에서 추천 질문을 선택하면 이 영역에 표시됩니다.";
 
         return `
           <div class="relative mx-auto max-w-7xl px-6 py-10 md:px-10 lg:px-14">
@@ -1129,12 +1146,6 @@
 
             <div class="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
               <div class="space-y-3 xl:sticky xl:top-6 xl:h-fit">
-                <button
-                  onclick="openCustomQuestionModal()"
-                  class="flex w-full items-center justify-center gap-2 rounded-[22px] bg-orange-500 px-4 py-4 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600"
-                >
-                  + 직무 전문성 검증 질문 추가
-                </button>
 
                 <aside class="rounded-[28px] border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur">
                   <p class="mb-3 px-2 text-sm font-semibold text-slate-900">${data.labels.questionSet}</p>
@@ -1340,8 +1351,8 @@
                     !customQuestions.length
                       ? `
                     <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                      <p class="text-sm font-semibold text-slate-700">아직 등록된 질문이 없습니다.</p>
-                      <p class="mt-2 text-sm text-slate-500">왼쪽의 질문 추가 버튼으로 면접 전 질문을 등록해두세요.</p>
+                      <p class="text-sm font-semibold text-slate-700">아직 추가된 AI 추천 질문이 없습니다.</p>
+                      <p class="mt-2 text-sm text-slate-500">AI 이력서 분석 페이지에서 추천 질문을 선택하면 이 영역에 표시됩니다.</p>
                     </div>
                   `
                       : `
@@ -1756,7 +1767,7 @@ function renderPdfPreview() {
                 <div class="mt-6 rounded-3xl border border-blue-100 bg-blue-50/40 p-5">
                   <p class="text-lg font-semibold text-slate-900">AI 이력서 분석 브리프</p>
                   <div class="mt-3 text-sm leading-7 text-slate-700">
-                    <p><span class="font-semibold text-slate-900">종합 적합도</span> : ${getCurrentAiBrief().overallFitScore || "-"} / 100</p>
+                    <p><span class="font-semibold text-slate-900">AI 참고 점수</span> : ${getCurrentAiBrief().overallFitScore || "-"} / 100</p>
                     <p class="mt-2"><span class="font-semibold text-slate-900">지원자 요약</span> : ${nl2br(shortenLongQuotedText(getCurrentAiBrief().summary || "-"))}</p>
                     <p class="mt-2"><span class="font-semibold text-slate-900">JD 역량 적합도</span> : ${(getCurrentAiBrief().jdFit || []).map((item) => `${escapeHtml(item.competency)} ${Number(item.score || 0)}/100`).join(" / ") || "-"}</p>
                     <p class="mt-2"><span class="font-semibold text-slate-900">검증 포인트</span> : ${(getCurrentAiBrief().verificationPoints || []).map((item) => escapeHtml(shortenLongQuotedText(item))).join(" / ") || "-"}</p>
@@ -2112,18 +2123,24 @@ function renderPdfPreview() {
               </div>
 
               <div class="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2">
-                <button
-                  onclick="openAddCandidateModal()"
-                  class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
-                >
-                  + 후보자 직접 추가
-                </button>
-                <button
-                  onclick="goAiResumeAnalysis()"
-                  class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
-                >
-                  AI 이력서 분석으로 후보자 추가
-                </button>
+                <div class="rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
+                  <button
+                    onclick="openAddCandidateModal()"
+                    class="w-full rounded-full border border-blue-200 bg-white px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50"
+                  >
+                    + 후보자 직접 추가
+                  </button>
+                  <p class="mt-2 text-center text-xs leading-5 text-blue-700">AI 분석 없이 후보자 세션만 생성합니다.</p>
+                </div>
+                <div class="rounded-3xl border border-blue-100 bg-white p-4">
+                  <button
+                    onclick="goAiResumeAnalysis()"
+                    class="w-full rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)]"
+                  >
+                    AI 이력서 분석으로 후보자 추가
+                  </button>
+                  <p class="mt-2 text-center text-xs leading-5 text-slate-500">이력서를 분석해 AI 브리프와 추천 질문을 생성합니다.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -2293,6 +2310,7 @@ function renderPdfPreview() {
       window.scrollToSection = scrollToSection;
       window.scrollToTop = scrollToTop;
       window.toggleJdFitEvidence = toggleJdFitEvidence;
+      window.toggleAiBriefCollapsed = toggleAiBriefCollapsed;
       window.openPdfPreview = openPdfPreview;
       window.closePdfPreview = closePdfPreview;
       window.openCautionModal = openCautionModal;
