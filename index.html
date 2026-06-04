@@ -146,7 +146,9 @@
 
       function getDefaultAiBrief() {
         return {
+          overallFitScore: null,
           summary: "",
+          jdFit: [],
           strengths: [],
           concerns: [],
           verificationPoints: [],
@@ -312,6 +314,8 @@
       function hasAiBrief(brief = getCurrentAiBrief()) {
         return Boolean(
           brief.summary ||
+          brief.overallFitScore ||
+          brief.jdFit?.length ||
           brief.strengths?.length ||
           brief.concerns?.length ||
           brief.verificationPoints?.length
@@ -878,6 +882,27 @@
           `;
         };
 
+        const renderJdFit = (items) => {
+          if (!items || !items.length) {
+            return `<p class="text-sm leading-6 text-slate-400">등록된 JD 역량 적합도 없음</p>`;
+          }
+          return `
+            <div class="grid gap-3 md:grid-cols-2">
+              ${items.map((item, index) => `
+                <details class="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3" ${index === 0 ? "open" : ""}>
+                  <summary class="cursor-pointer list-none">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <p class="text-sm font-semibold text-slate-900">${escapeHtml(item.competency)}</p>
+                      <span class="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">${Number(item.score || 0)} / 100</span>
+                    </div>
+                  </summary>
+                  <p class="mt-3 border-t border-slate-100 pt-3 text-sm leading-7 text-slate-600">${nl2br(item.evidence || "근거 없음")}</p>
+                </details>
+              `).join("")}
+            </div>
+          `;
+        };
+
         return `
           <section class="mb-8 rounded-[30px] border border-blue-100 bg-white/88 p-5 shadow-sm backdrop-blur md:p-6">
             <div class="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -895,33 +920,36 @@
               </span>
             </div>
 
-            <div class="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr_1fr]">
-              <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
-                <p class="mb-3 text-sm font-semibold text-slate-900">지원자 요약</p>
-                <p class="text-sm leading-7 text-slate-700">
-                  ${brief.summary ? nl2br(brief.summary) : "AI 이력서 분석 페이지에서 후보자를 등록하면 이 영역에 지원자 요약이 표시됩니다."}
-                </p>
+            <div class="grid gap-4">
+              <div class="grid gap-4 xl:grid-cols-[180px_minmax(0,1fr)]">
+                <div class="rounded-3xl border border-blue-100 bg-blue-50/70 p-4 text-center">
+                  <p class="text-sm font-semibold text-blue-700">종합 적합도</p>
+                  <p class="mt-3 text-4xl font-bold text-blue-700">${brief.overallFitScore || "-"}</p>
+                  <p class="mt-1 text-sm font-semibold text-blue-600">/ 100</p>
+                </div>
+                <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                  <p class="mb-3 text-sm font-semibold text-slate-900">지원자 요약</p>
+                  <p class="text-sm leading-7 text-slate-700">
+                    ${brief.summary ? nl2br(brief.summary) : "AI 이력서 분석 페이지에서 후보자를 등록하면 이 영역에 지원자 요약이 표시됩니다."}
+                  </p>
+                </div>
               </div>
 
-              <div class="rounded-3xl border border-emerald-100 bg-emerald-50/50 p-4">
-                <p class="mb-3 text-sm font-semibold text-emerald-900">강점</p>
-                ${renderItems(brief.strengths, "등록된 강점 없음")}
-              </div>
+              <div class="grid gap-4 xl:grid-cols-2">
+                <div class="rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                  <p class="mb-3 text-sm font-semibold text-slate-900">JD 역량 적합도</p>
+                  ${renderJdFit(brief.jdFit)}
+                </div>
 
-              <div class="rounded-3xl border border-rose-100 bg-rose-50/50 p-4">
-                <p class="mb-3 text-sm font-semibold text-rose-900">우려사항</p>
-                ${renderItems(brief.concerns, "등록된 우려사항 없음")}
-              </div>
-
-              <div class="rounded-3xl border border-amber-100 bg-amber-50/50 p-4">
-                <p class="mb-3 text-sm font-semibold text-amber-900">검증 포인트</p>
-                ${renderItems(brief.verificationPoints, "등록된 검증 포인트 없음")}
+                <div class="rounded-3xl border border-amber-100 bg-amber-50/50 p-4">
+                  <p class="mb-3 text-sm font-semibold text-amber-900">검증 포인트</p>
+                  ${renderItems(brief.verificationPoints, "등록된 검증 포인트 없음")}
+                </div>
               </div>
             </div>
           </section>
         `;
       }
-
       function renderGuide() {
         const data = window.INTERVIEW_DATA;
         const selected = getSelectedPosition();
@@ -1633,9 +1661,9 @@ function renderPdfPreview() {
                 <div class="mt-6 rounded-3xl border border-blue-100 bg-blue-50/40 p-5">
                   <p class="text-lg font-semibold text-slate-900">AI 이력서 분석 브리프</p>
                   <div class="mt-3 text-sm leading-7 text-slate-700">
-                    <p><span class="font-semibold text-slate-900">지원자 요약</span> : ${nl2br(getCurrentAiBrief().summary || "-")}</p>
-                    <p class="mt-2"><span class="font-semibold text-slate-900">강점</span> : ${(getCurrentAiBrief().strengths || []).map(escapeHtml).join(" / ") || "-"}</p>
-                    <p class="mt-2"><span class="font-semibold text-slate-900">우려사항</span> : ${(getCurrentAiBrief().concerns || []).map(escapeHtml).join(" / ") || "-"}</p>
+                    <p><span class="font-semibold text-slate-900">종합 적합도</span> : ${getCurrentAiBrief().overallFitScore || "-"} / 100</p>
+                    <p class="mt-2"><span class="font-semibold text-slate-900">지원자 요약</span> : ${nl2br(getCurrentAiBrief().summary || "-")}</p>
+                    <p class="mt-2"><span class="font-semibold text-slate-900">JD 역량 적합도</span> : ${(getCurrentAiBrief().jdFit || []).map((item) => `${escapeHtml(item.competency)} ${Number(item.score || 0)}/100`).join(" / ") || "-"}</p>
                     <p class="mt-2"><span class="font-semibold text-slate-900">검증 포인트</span> : ${(getCurrentAiBrief().verificationPoints || []).map(escapeHtml).join(" / ") || "-"}</p>
                   </div>
                 </div>
