@@ -276,6 +276,20 @@
         return `${position} · ${name}`;
       }
 
+      function isAnalysisAddedToGuide(item) {
+        if (!item) return false;
+        if (item.addedToGuide) return true;
+
+        const candidatesByPosition = getAllCandidates();
+        const candidates = candidatesByPosition[item.positionId] || [];
+        const candidateNameKey = (item.candidateName || "").trim();
+
+        return candidates.some((candidate) => {
+          if (item.candidateId && candidate.id === item.candidateId) return true;
+          return candidateNameKey && (candidate.name || "").trim() === candidateNameKey;
+        });
+      }
+
       function saveAnalysisHistorySnapshot() {
         if (!analysisResult) return;
         const selected = getSelectedPosition();
@@ -1301,7 +1315,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             ` : `
               <div class="space-y-2">
                 ${history.slice(0, 8).map((item) => {
-                  const added = Boolean(item.addedToGuide);
+                  const added = isAnalysisAddedToGuide(item);
                   return `
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <button onclick="loadAnalysisHistory('${item.id}')" class="w-full text-left">
@@ -1346,7 +1360,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
 
         const renderJdFit = (items) => items?.length
           ? items.map((item, index) => `
-              <details class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm" ${index === 0 ? "open" : ""}>
+              <details class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <summary class="cursor-pointer list-none">
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
