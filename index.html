@@ -93,9 +93,20 @@
 
     <div id="app" class="app-shell"></div>
 
-    <script src="interview-data.js"></script>
-    <script>
-      const app = document.getElementById("app");
+<script src="interview-data.js"></script>
+<script>
+  const VERCEL_APP_URL = "https://interview-guide-roan.vercel.app";
+
+  if (window.location.hostname.includes("github.io")) {
+    const currentPath = window.location.pathname || "/";
+    const currentSearch = window.location.search || "";
+    const currentHash = window.location.hash || "";
+
+    const normalizedPath = currentPath.replace(/^\/interview-guide/, "") || "/";
+    window.location.replace(`${VERCEL_APP_URL}${normalizedPath}${currentSearch}${currentHash}`);
+  }
+
+  const app = document.getElementById("app");
 
       let currentPage = "landing";
       let selectedPositionId = window.INTERVIEW_DATA.positions[0]?.id || "";
