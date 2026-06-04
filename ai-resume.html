@@ -7,6 +7,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
       @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -57,6 +58,7 @@
       const POSITION_CONTEXT_STORAGE_KEY = "dozn_ai_position_contexts_v1";
       const CANDIDATE_STORAGE_KEY = "dozn_interview_candidates_v1";
       const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v2";
+      const ANALYSIS_HISTORY_STORAGE_KEY = "dozn_ai_resume_analysis_history_v1";
 
       let selectedPositionId = new URLSearchParams(window.location.search).get("positionId") || window.INTERVIEW_DATA.positions[0]?.id || "";
       let candidateName = "";
@@ -249,6 +251,192 @@
 
       function setAllCustomQuestions(data) {
         localStorage.setItem(CUSTOM_QUESTION_STORAGE_KEY, JSON.stringify(data));
+      }
+
+
+      function getAnalysisHistory() {
+        try {
+          const history = JSON.parse(localStorage.getItem(ANALYSIS_HISTORY_STORAGE_KEY)) || [];
+          return Array.isArray(history) ? history : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function setAnalysisHistory(history) {
+        localStorage.setItem(ANALYSIS_HISTORY_STORAGE_KEY, JSON.stringify(history));
+      }
+
+      function getAnalysisSnapshotTitle(item) {
+        const name = item?.candidateName?.trim() || "후보자명 미입력";
+        const position = item?.positionName || "포지션";
+        return `${position} · ${name}`;
+      }
+
+      function saveAnalysisHistorySnapshot() {
+        if (!analysisResult) return;
+        const selected = getSelectedPosition();
+        const snapshot = {
+          id: `analysis_${Date.now()}`,
+          savedAt: formatDate(),
+          positionId: selectedPositionId,
+          positionName: selected?.name || "",
+          candidateName: candidateName.trim(),
+          analysisResult: JSON.parse(JSON.stringify(analysisResult)),
+          selectedQuestionIds: JSON.parse(JSON.stringify(selectedQuestionIds || {})),
+        };
+
+        const history = getAnalysisHistory();
+        history.unshift(snapshot);
+        setAnalysisHistory(history.slice(0, 50));
+      }
+
+      function loadAnalysisHistory(historyId) {
+        const history = getAnalysisHistory();
+        const item = history.find((entry) => entry.id === historyId);
+        if (!item) {
+          alert("저장된 분석 결과를 찾을 수 없습니다.");
+          return;
+        }
+
+        selectedPositionId = item.positionId;
+        candidateName = item.candidateName || "";
+        analysisResult = item.analysisResult ? normalizeAnalysis(item.analysisResult) : null;
+        selectedQuestionIds = item.selectedQuestionIds || {};
+        resumeText = "";
+        errorMessage = "";
+        contextDraft = null;
+        render();
+        setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
+      }
+
+      function deleteAnalysisHistory(historyId, event) {
+        if (event) event.stopPropagation();
+        const ok = confirm("이 분석 결과 저장 기록을 삭제할까요?\n이력서 원본은 저장되어 있지 않으며, 저장된 AI 브리프와 질문 기록만 삭제됩니다.");
+        if (!ok) return;
+        const history = getAnalysisHistory().filter((entry) => entry.id !== historyId);
+        setAnalysisHistory(history);
+        render();
+      }
+
+      function getSafeFileName(value) {
+        return String(value || "")
+          .replace(/[\\/:*?"<>|]/g, "_")
+          .replace(/\s+/g, "_")
+          .slice(0, 80);
+      }
+
+      function buildAnalysisPdfHtml() {
+        const selected = getSelectedPosition();
+        const name = candidateName.trim() || "후보자명 미입력";
+        const result = analysisResult || {};
+        const renderList = (items) => (items || []).length
+          ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+          : `<p class="empty">내용 없음</p>`;
+        const renderJdFit = (items) => (items || []).length
+          ? items.map((item) => `
+            <div class="box small-break">
+              <div class="row">
+                <strong>${escapeHtml(item.competency)}</strong>
+                <span>${Number(item.score || 0)} / 100</span>
+              </div>
+              <p>${nl2br(item.evidence || "근거 없음")}</p>
+            </div>
+          `).join("")
+          : `<p class="empty">JD 역량 적합도 없음</p>`;
+        const renderQuestions = (items) => (items || []).length
+          ? items.map((question, index) => `
+            <div class="box small-break">
+              <div class="question-meta">
+                <span>${escapeHtml(question.type || "AI 이력서 기반")}</span>
+                ${selectedQuestionIds[question.id] ? `<b>선택 질문</b>` : ``}
+              </div>
+              <h4>Q${index + 1}. ${escapeHtml(question.main)}</h4>
+              ${question.follow?.length ? `<p><strong>꼬리 질문</strong><br>${question.follow.map(escapeHtml).join("<br>")}</p>` : ""}
+              <p><strong>질문 의도</strong><br>${escapeHtml(question.intent || "-")}</p>
+              <p><strong>이력서 근거</strong><br>${escapeHtml(question.sourceEvidence || "-")}</p>
+            </div>
+          `).join("")
+          : `<p class="empty">후보자 맞춤 질문 없음</p>`;
+
+        return `
+          <div class="pdf-doc">
+            <style>
+              .pdf-doc { width: 720px; padding: 32px; background: #fff; color: #1e293b; font-family: Pretendard, Arial, sans-serif; }
+              .pdf-doc h1 { margin: 8px 0 6px; font-size: 26px; }
+              .pdf-doc h2 { margin: 28px 0 12px; font-size: 18px; color: #0f172a; }
+              .pdf-doc h3 { margin: 0; font-size: 15px; }
+              .pdf-doc h4 { margin: 10px 0; font-size: 14px; line-height: 1.6; }
+              .pdf-doc p, .pdf-doc li { font-size: 12px; line-height: 1.8; }
+              .pdf-doc ul { margin: 0; padding-left: 18px; }
+              .eyebrow { font-size: 11px; letter-spacing: .14em; color: #64748b; }
+              .meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 18px; }
+              .meta div, .summary, .box { border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px; background: #f8fafc; }
+              .summary { background: #eff6ff; border-color: #bfdbfe; }
+              .score { display: inline-block; margin-bottom: 8px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; padding: 5px 10px; font-weight: 700; font-size: 12px; }
+              .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+              .row span { color: #2563eb; font-weight: 700; font-size: 12px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+              .question-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+              .question-meta span, .question-meta b { border-radius: 999px; padding: 4px 9px; font-size: 11px; background: #fff7ed; color: #c2410c; }
+              .question-meta b { background: #dbeafe; color: #1d4ed8; }
+              .small-break { page-break-inside: avoid; break-inside: avoid; margin-bottom: 10px; }
+              .empty { color: #94a3b8; }
+            </style>
+            <div class="eyebrow">DOZN AI RESUME ANALYSIS</div>
+            <h1>${escapeHtml(selected?.name || "포지션")} AI 이력서 분석 결과</h1>
+            <div class="meta">
+              <div><h3>후보자명</h3><p>${escapeHtml(name)}</p></div>
+              <div><h3>분석일</h3><p>${escapeHtml(formatDate())}</p></div>
+              <div><h3>포지션</h3><p>${escapeHtml(selected?.name || "-")}</p></div>
+            </div>
+
+            <h2>지원자 요약</h2>
+            <div class="summary small-break">
+              <div class="score">${result.overallFitScore || "-"} / 100 종합 적합도</div>
+              <p>${nl2br(result.summary || "내용 없음")}</p>
+            </div>
+
+            <h2>JD 역량 적합도</h2>
+            ${renderJdFit(result.jdFit)}
+
+            <h2>검증 포인트</h2>
+            <div class="box small-break">${renderList(result.verificationPoints)}</div>
+
+            <h2>후보자 맞춤 질문</h2>
+            ${renderQuestions(result.questions)}
+          </div>
+        `;
+      }
+
+      function downloadAnalysisPdf() {
+        if (!analysisResult) {
+          alert("먼저 AI 분석을 실행하거나 저장된 분석 결과를 불러와 주세요.");
+          return;
+        }
+        if (!window.html2pdf) {
+          alert("PDF 저장 라이브러리를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+          return;
+        }
+
+        const selected = getSelectedPosition();
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = buildAnalysisPdfHtml();
+        document.body.appendChild(wrapper);
+
+        const fileName = `${getSafeFileName(selected?.name || "포지션")}_${getSafeFileName(candidateName || "후보자")}_AI이력서분석.pdf`;
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: fileName,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        };
+
+        html2pdf().set(opt).from(wrapper.firstElementChild).save().finally(() => {
+          document.body.removeChild(wrapper);
+        });
       }
 
       function getQuestionRubric() {
@@ -654,6 +842,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           analysisResult.questions.forEach((question) => {
             selectedQuestionIds[question.id] = true;
           });
+          saveAnalysisHistorySnapshot();
         } catch (error) {
           console.error(error);
           errorMessage = error.message || "AI 분석 중 오류가 발생했습니다.";
@@ -864,6 +1053,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         analysisResult.questions.forEach((question) => {
           selectedQuestionIds[question.id] = true;
         });
+        saveAnalysisHistorySnapshot();
         render();
       }
 
@@ -939,9 +1129,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             <div class="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <p class="text-sm font-medium ${isSaved ? "text-blue-600" : "text-amber-700"}">포지션 분석 기준</p>
-                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준</h2>
+                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준 등록</h2>
                 <p class="mt-2 text-xs leading-5 text-slate-500">
-                  AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 등록 예정입니다.<br>개별적으로 등록하거나, 임의로 수정하지 말아주세요.
+                  AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 등록 예정으로, 개별적으로 등록하거나, 임의로 수정하지 말아주세요.
                 </p>
               </div>
               <span class="shrink-0 rounded-full ${isSaved ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
@@ -995,6 +1185,45 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 입력 내용 되돌리기
               </button>
             </div>
+          </section>
+        `;
+      }
+
+
+      function renderAnalysisHistoryPanel() {
+        const history = getAnalysisHistory().filter((item) => item.positionId === selectedPositionId);
+        const selected = getSelectedPosition();
+        return `
+          <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 class="text-xl font-semibold text-slate-900">저장된 분석 결과</h2>
+                <p class="mt-2 text-xs leading-5 text-slate-500">
+                  이력서 원본은 저장하지 않고, AI 분석 결과와 선택 질문만 브라우저에 저장됩니다.
+                </p>
+              </div>
+              <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">${history.length}개</span>
+            </div>
+            ${!history.length ? `
+              <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-xs leading-5 text-slate-500">
+                아직 ${escapeHtml(selected?.name || "현재 포지션")}에 저장된 분석 결과가 없습니다.
+              </div>
+            ` : `
+              <div class="space-y-2">
+                ${history.slice(0, 8).map((item) => `
+                  <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <button onclick="loadAnalysisHistory('${item.id}')" class="w-full text-left">
+                      <p class="text-sm font-semibold text-slate-900">${escapeHtml(item.candidateName || "후보자명 미입력")}</p>
+                      <p class="mt-1 text-xs text-slate-500">${escapeHtml(item.savedAt || "-")} · 적합도 ${escapeHtml(item.analysisResult?.overallFitScore || "-")}/100</p>
+                    </button>
+                    <div class="mt-3 flex gap-2">
+                      <button onclick="loadAnalysisHistory('${item.id}')" class="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">불러오기</button>
+                      <button onclick="deleteAnalysisHistory('${item.id}', event)" class="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600">삭제</button>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+            `}
           </section>
         `;
       }
@@ -1191,7 +1420,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <h2 class="text-xl font-semibold text-slate-900">이력서 AI 분석</h2>
                   <p class="mt-2 text-xs leading-5 text-slate-500">
-                    분석 횟수에 따라 토큰이 차감됩니다.<br>무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
+                    분석 횟수에 따라 토큰이 차감됩니다. 무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
                   </p>
 
                   <div class="mt-5 grid gap-2">
@@ -1204,6 +1433,8 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                     오류 발생 시 HR팀 오지현 매니저에게 문의 바랍니다.
                   </div>
                 </section>
+
+                ${renderAnalysisHistoryPanel()}
               </aside>
 
               <main class="space-y-6">
@@ -1213,9 +1444,12 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                       <p class="text-sm font-medium text-blue-600">${escapeHtml(selected.name)}</p>
                       <h2 class="mt-1 text-2xl font-semibold text-slate-900">AI 분석 결과</h2>
                     </div>
-                    <span class="rounded-full ${contextReady ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
-                      ${contextReady ? "포지션 기준 분석 준비 완료" : "분석 기준 등록 필요"}
-                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                      ${analysisResult ? `<button onclick="downloadAnalysisPdf()" class="rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100">PDF 저장</button>` : ""}
+                      <span class="rounded-full ${contextReady ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
+                        ${contextReady ? "포지션 기준 분석 준비 완료" : "분석 기준 등록 필요"}
+                      </span>
+                    </div>
                   </div>
                   ${!contextReady ? `<div class="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">해당 포지션의 분석 기준이 아직 등록되지 않았습니다. HR팀에 문의해주세요.</div>` : ""}
                   ${errorMessage ? `<div class="mb-5 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">${escapeHtml(errorMessage)}</div>` : ""}
@@ -1231,9 +1465,14 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                       <h2 class="mt-1 text-xl font-semibold text-slate-900">선택한 질문을 후보자 세션에 추가</h2>
                       <p class="mt-2 text-sm leading-6 text-slate-500">후보자명, AI 브리프, 선택 질문이 저장되고 해당 후보자의 면접 페이지로 이동합니다.</p>
                     </div>
-                    <button onclick="saveToGuide()" class="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600 disabled:opacity-50" ${!analysisResult ? "disabled" : ""}>
-                      구조화면접 가이드에 추가
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                      <button onclick="downloadAnalysisPdf()" class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100 disabled:opacity-50" ${!analysisResult ? "disabled" : ""}>
+                        PDF 저장
+                      </button>
+                      <button onclick="saveToGuide()" class="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(249,115,22,0.25)] transition hover:bg-orange-600 disabled:opacity-50" ${!analysisResult ? "disabled" : ""}>
+                        구조화면접 가이드에 추가
+                      </button>
+                    </div>
                   </div>
                 </section>
               </main>
@@ -1247,6 +1486,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
       window.generateDemoAnalysis = generateDemoAnalysis;
       window.toggleQuestion = toggleQuestion;
       window.saveToGuide = saveToGuide;
+      window.downloadAnalysisPdf = downloadAnalysisPdf;
+      window.loadAnalysisHistory = loadAnalysisHistory;
+      window.deleteAnalysisHistory = deleteAnalysisHistory;
       window.updateContextField = updateContextField;
       window.savePositionContext = savePositionContext;
       window.resetPositionContextDraft = resetPositionContextDraft;
