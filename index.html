@@ -106,10 +106,12 @@
       let showDraftModal = false;
       let showCustomQuestionModal = false;
       let showCandidateModal = false;
+      let showAddCandidateModal = false;
       let isProgrammaticScroll = false;
       let showScrollTopButton = false;
 
       let selectedCandidateId = "";
+      let newCandidateName = "";
       let selectedScores = {};
       let formStateBySession = {};
 
@@ -231,12 +233,71 @@
         }, 50);
       }
 
+      function openAddCandidateModal() {
+        newCandidateName = "";
+        showAddCandidateModal = true;
+        render();
+
+        setTimeout(() => {
+          const input = document.getElementById("new-candidate-name-input");
+          if (input) input.focus();
+        }, 50);
+      }
+
+      function closeAddCandidateModal() {
+        showAddCandidateModal = false;
+        newCandidateName = "";
+        render();
+      }
+
+      function updateNewCandidateName(value) {
+        newCandidateName = value;
+      }
+
       function addCandidateDirectly() {
-        const name = prompt("후보자명을 입력해주세요.");
-        if (!name || !name.trim()) return;
+        const name = newCandidateName.trim();
+        if (!name) {
+          alert("후보자명을 입력해주세요.");
+          return;
+        }
 
         const candidate = createCandidate(selectedPositionId, name);
+        showAddCandidateModal = false;
+        newCandidateName = "";
         openCandidateGuide(candidate.id);
+      }
+
+      function deleteCandidate(candidateId) {
+        const candidates = getCandidatesForPosition(selectedPositionId);
+        const target = candidates.find((candidate) => candidate.id === candidateId);
+        if (!target) return;
+
+        const ok = confirm(`${target.name} 후보자를 삭제할까요?\n저장된 평가 내용과 추가 질문도 함께 삭제됩니다.`);
+        if (!ok) return;
+
+        const sessionKey = getSessionKey(selectedPositionId, candidateId);
+        setCandidatesForPosition(
+          selectedPositionId,
+          candidates.filter((candidate) => candidate.id !== candidateId)
+        );
+
+        delete formStateBySession[sessionKey];
+
+        const allCustomQuestions = getAllCustomQuestions();
+        delete allCustomQuestions[sessionKey];
+        setAllCustomQuestions(allCustomQuestions);
+
+        const scorePrefix = getScorePrefix(selectedPositionId, candidateId);
+        Object.keys(selectedScores).forEach((key) => {
+          if (key.startsWith(scorePrefix)) delete selectedScores[key];
+        });
+
+        if (selectedCandidateId === candidateId) {
+          selectedCandidateId = "";
+          currentPage = "landing";
+        }
+
+        render();
       }
 
       function goAiResumeAnalysis() {
@@ -374,6 +435,7 @@
         showDraftModal = false;
         showCustomQuestionModal = false;
         showCandidateModal = false;
+        showAddCandidateModal = false;
         showScrollTopButton = false;
         render();
       }
@@ -786,7 +848,7 @@
                     .join("")}
                 </div>
 
-                <div class="mt-6 flex justify-center border-t border-slate-200 pt-5">
+                <div class="mt-6 flex justify-end border-t border-slate-200 pt-5">
                   <a
                     href="manual.html"
                     class="rounded-full border border-orange-200 bg-orange-50 px-5 py-3 text-sm font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
@@ -1895,20 +1957,31 @@ function renderPdfPreview() {
                     : candidates
                         .map(
                           (candidate) => `
-                    <button
-                      onclick="openCandidateGuide('${candidate.id}')"
-                      class="w-full rounded-3xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40"
+                    <div
+                      class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/30"
                     >
-                      <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
+                      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <button
+                          onclick="openCandidateGuide('${candidate.id}')"
+                          class="min-w-0 flex-1 text-left"
+                        >
                           <p class="text-lg font-semibold text-slate-900">${escapeHtml(candidate.name)}</p>
                           <p class="mt-1 text-sm text-slate-500">생성일: ${escapeHtml(candidate.createdAt || "-")}</p>
+                        </button>
+
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                          <span class="rounded-full ${hasAiBrief(candidate.aiBrief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
+                            ${hasAiBrief(candidate.aiBrief) ? "AI 브리프 있음" : "AI 브리프 없음"}
+                          </span>
+                          <button
+                            onclick="deleteCandidate('${candidate.id}')"
+                            class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                          >
+                            삭제
+                          </button>
                         </div>
-                        <span class="rounded-full ${hasAiBrief(candidate.aiBrief) ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-500"} px-3 py-1 text-xs font-semibold">
-                          ${hasAiBrief(candidate.aiBrief) ? "AI 브리프 있음" : "AI 브리프 없음"}
-                        </span>
                       </div>
-                    </button>
+                    </div>
                   `
                         )
                         .join("")
@@ -1917,7 +1990,7 @@ function renderPdfPreview() {
 
               <div class="mt-6 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2">
                 <button
-                  onclick="addCandidateDirectly()"
+                  onclick="openAddCandidateModal()"
                   class="rounded-full border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-100"
                 >
                   + 후보자 직접 추가
@@ -1934,6 +2007,57 @@ function renderPdfPreview() {
         `;
       }
 
+      function renderAddCandidateModal() {
+        if (!showAddCandidateModal) return "";
+
+        const selected = getSelectedPosition();
+
+        return `
+          <div class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 py-8 backdrop-blur-sm">
+            <div class="w-full max-w-md rounded-[32px] bg-white p-6 shadow-2xl md:p-7">
+              <div class="mb-5 border-b border-slate-100 pb-4">
+                <p class="text-sm font-medium text-blue-600">후보자 직접 추가</p>
+                <h3 class="mt-1 text-2xl font-semibold text-slate-900">${selected.name}</h3>
+                <p class="mt-2 text-sm leading-6 text-slate-500">
+                  후보자명을 입력하면 해당 포지션의 면접 세션이 생성됩니다.
+                </p>
+              </div>
+
+              <label class="text-sm font-semibold text-slate-700">
+                후보자명 <span class="text-rose-500">*</span>
+                <input
+                  id="new-candidate-name-input"
+                  class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                  placeholder="예: 홍길동"
+                  value="${escapeHtml(newCandidateName)}"
+                  oninput="updateNewCandidateName(this.value)"
+                  onkeydown="if(event.key === 'Enter') addCandidateDirectly()"
+                />
+              </label>
+
+              <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-6 text-blue-800">
+                직접 추가한 후보자는 AI 브리프 없이 생성되며, 이후 면접 질문과 평가 기록을 후보자별로 저장할 수 있습니다.
+              </div>
+
+              <div class="mt-6 flex justify-end gap-2 border-t border-slate-100 pt-5">
+                <button
+                  onclick="closeAddCandidateModal()"
+                  class="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  취소
+                </button>
+                <button
+                  onclick="addCandidateDirectly()"
+                  class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)] transition hover:scale-[1.01]"
+                >
+                  후보자 추가
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
       function renderScrollTopButton() {
         if (
           currentPage !== "guide" ||
@@ -1942,7 +2066,8 @@ function renderPdfPreview() {
           showCautionModal ||
           showDraftModal ||
           showCustomQuestionModal ||
-          showCandidateModal
+          showCandidateModal ||
+          showAddCandidateModal
         ) {
           return "";
         }
@@ -1997,6 +2122,7 @@ function renderPdfPreview() {
           ${renderCustomQuestionModal()}
           ${renderDraftModal()}
           ${renderCandidateModal()}
+          ${renderAddCandidateModal()}
           ${renderScrollTopButton()}
         `;
       }
@@ -2006,7 +2132,11 @@ function renderPdfPreview() {
       window.openCandidateModal = openCandidateModal;
       window.closeCandidateModal = closeCandidateModal;
       window.openCandidateGuide = openCandidateGuide;
+      window.openAddCandidateModal = openAddCandidateModal;
+      window.closeAddCandidateModal = closeAddCandidateModal;
+      window.updateNewCandidateName = updateNewCandidateName;
       window.addCandidateDirectly = addCandidateDirectly;
+      window.deleteCandidate = deleteCandidate;
       window.goAiResumeAnalysis = goAiResumeAnalysis;
       window.goLanding = goLanding;
       window.scrollToSection = scrollToSection;
@@ -2050,7 +2180,8 @@ function renderPdfPreview() {
             !showCautionModal &&
             !showDraftModal &&
             !showCustomQuestionModal &&
-            !showCandidateModal;
+            !showCandidateModal &&
+            !showAddCandidateModal;
 
           if (shouldShow !== showScrollTopButton) {
             showScrollTopButton = shouldShow;
