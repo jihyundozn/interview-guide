@@ -943,11 +943,15 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         render();
 
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 70000);
+
           const response = await fetch("/api/analyze-resume", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
+            signal: controller.signal,
             body: JSON.stringify({
               positionContext: getAnalysisPositionContext(),
               resumeText: resumePdfBase64 ? "" : resumeText,
@@ -956,9 +960,16 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
               resumePdfName,
               existingQuestions: getExistingQuestionsForApi(),
             }),
-          });
+          }).finally(() => clearTimeout(timeoutId));
 
-          const data = await response.json();
+          const responseText = await response.text();
+          let data = {};
+          try {
+            data = responseText ? JSON.parse(responseText) : {};
+          } catch (parseError) {
+            throw new Error("AI 분석 서버 응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.");
+          }
+
           if (!response.ok) {
             throw new Error(data.error || "AI 분석 요청에 실패했습니다.");
           }
@@ -974,7 +985,11 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           saveAnalysisHistorySnapshot();
         } catch (error) {
           console.error(error);
-          errorMessage = error.message || "AI 분석 중 오류가 발생했습니다.";
+          if (error.name === "AbortError") {
+            errorMessage = "AI 분석 시간이 초과되었습니다. PDF 용량을 줄이거나 잠시 후 다시 시도해 주세요.";
+          } else {
+            errorMessage = error.message || "AI 분석 중 오류가 발생했습니다.";
+          }
         } finally {
           isAnalyzing = false;
           render();
