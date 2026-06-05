@@ -701,6 +701,84 @@
         };
       }
 
+      function normalizeExtractedPdfText(value) {
+        return String(value || "")
+          .replace(/\u00a0/g, " ")
+          .replace(/[  ]+/g, "")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/([가-힣])([A-Za-z0-9])/g, "$1 $2")
+          .replace(/([A-Za-z0-9])([가-힣])/g, "$1 $2")
+          .replace(/,(?=\S)/g, ", ")
+          .replace(/\.(?=\S)/g, ". ")
+          .replace(/\s{2,}/g, " ")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .join("\n")
+          .trim();
+      }
+
+      async function extractPdfTextWithLayout(file) {
+        if (!window.pdfjsLib) return "";
+
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        const pages = [];
+
+        for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+          const page = await pdf.getPage(pageNo);
+          const content = await page.getTextContent();
+          const items = (content.items || [])
+            .map((item) => {
+              const transform = item.transform || [];
+              return {
+                text: String(item.str || ""),
+                x: Number(transform[4] || 0),
+                y: Number(transform[5] || 0),
+                width: Number(item.width || 0),
+                height: Number(item.height || Math.abs(transform[3]) || 10),
+              };
+            })
+            .filter((item) => item.text.trim());
+
+          items.sort((a, b) => {
+            const yGap = b.y - a.y;
+            if (Math.abs(yGap) > Math.max(a.height, b.height, 10) * 0.45) return yGap;
+            return a.x - b.x;
+          });
+
+          const lines = [];
+          let line = "";
+          let previous = null;
+
+          items.forEach((item) => {
+            const lineThreshold = Math.max(item.height, previous?.height || 10, 10) * 0.45;
+            const isNewLine = previous && Math.abs(item.y - previous.y) > lineThreshold;
+
+            if (isNewLine) {
+              if (line.trim()) lines.push(line.trim());
+              line = "";
+              previous = null;
+            }
+
+            if (previous) {
+              const gap = item.x - (previous.x + previous.width);
+              const needsSpace = gap > Math.max(previous.height, item.height, 10) * 0.18;
+              if (needsSpace && !/\s$/.test(line)) line += " ";
+            }
+
+            line += item.text;
+            previous = item;
+          });
+
+          if (line.trim()) lines.push(line.trim());
+          pages.push(lines.join("\n"));
+        }
+
+        return normalizeExtractedPdfText(pages.join("\n\n"));
+      }
+
       async function handlePdfUpload(input) {
         const file = input.files?.[0];
         if (!file) return;
@@ -726,7 +804,7 @@
         render();
 
         try {
-          const base64 = await new Promise((resolve, reject) => {
+          const base64Promise = new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
               const result = String(reader.result || "");
@@ -735,9 +813,14 @@
             reader.onerror = () => reject(reader.error || new Error("파일을 읽지 못했습니다."));
             reader.readAsDataURL(file);
           });
+          const textPromise = extractPdfTextWithLayout(file).catch((error) => {
+            console.warn("PDF text extraction failed:", error);
+            return "";
+          });
+          const [base64, extractedText] = await Promise.all([base64Promise, textPromise]);
 
           resumePdfBase64 = base64;
-          resumeText = `PDF 원본 파일이 업로드되었습니다. (${file.name})
+          resumeText = extractedText || `PDF 원본 파일이 업로드되었습니다. (${file.name})
 Gemini가 PDF 원본을 직접 읽어 분석합니다.`;
         } catch (error) {
           console.error(error);
@@ -954,7 +1037,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             signal: controller.signal,
             body: JSON.stringify({
               positionContext: getAnalysisPositionContext(),
-              resumeText: resumePdfBase64 ? "" : resumeText,
+              resumeText,
               resumePdfBase64,
               resumePdfMimeType,
               resumePdfName,
