@@ -73,6 +73,9 @@
       let selectedPositionId = new URLSearchParams(window.location.search).get("positionId") || window.INTERVIEW_DATA.positions[0]?.id || "";
       let candidateName = "";
       let resumeText = "";
+      let resumePdfBase64 = "";
+      let resumePdfName = "";
+      let resumePdfMimeType = "application/pdf";
       let isAnalyzing = false;
       let isPdfParsing = false;
       let errorMessage = "";
@@ -708,30 +711,37 @@
           return;
         }
 
+        const maxFileSize = 7 * 1024 * 1024;
+        if (file.size > maxFileSize) {
+          alert("PDF 파일 용량이 너무 큽니다. 7MB 이하의 이력서 파일을 업로드해 주세요.");
+          input.value = "";
+          return;
+        }
+
         isPdfParsing = true;
         errorMessage = "";
+        resumePdfBase64 = "";
+        resumePdfName = file.name;
+        resumePdfMimeType = file.type || "application/pdf";
         render();
 
         try {
-          const buffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-          const maxPages = Math.min(pdf.numPages, 20);
-          const pages = [];
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = String(reader.result || "");
+              resolve(result.includes(",") ? result.split(",")[1] : result);
+            };
+            reader.onerror = () => reject(reader.error || new Error("파일을 읽지 못했습니다."));
+            reader.readAsDataURL(file);
+          });
 
-          for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
-            const page = await pdf.getPage(pageNumber);
-            const content = await page.getTextContent();
-            const text = content.items.map((item) => item.str).join(" ");
-            pages.push(`[${pageNumber}p] ${text}`);
-          }
-
-          resumeText = pages.join("\n\n").trim();
-          if (!resumeText) {
-            errorMessage = "PDF에서 텍스트를 추출하지 못했습니다. 이미지형 PDF라면 텍스트를 직접 붙여넣어 주세요.";
-          }
+          resumePdfBase64 = base64;
+          resumeText = `PDF 원본 파일이 업로드되었습니다. (${file.name})
+Gemini가 PDF 원본을 직접 읽어 분석합니다.`;
         } catch (error) {
           console.error(error);
-          errorMessage = "PDF를 읽는 중 오류가 발생했습니다. 텍스트를 직접 붙여넣어 주세요.";
+          errorMessage = "PDF 파일을 읽는 중 오류가 발생했습니다. 다시 업로드해 주세요.";
         } finally {
           isPdfParsing = false;
           render();
@@ -743,7 +753,7 @@
           alert("포지션 분석 기준의 주요업무가 등록되어 있어야 이력서를 분석할 수 있습니다.");
           return false;
         }
-        if (!resumeText.trim()) {
+        if (!resumePdfBase64 && !resumeText.trim()) {
           alert("이력서 PDF를 업로드하거나 텍스트를 붙여넣어 주세요.");
           return false;
         }
@@ -940,7 +950,10 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             },
             body: JSON.stringify({
               positionContext: getAnalysisPositionContext(),
-              resumeText,
+              resumeText: resumePdfBase64 ? "" : resumeText,
+              resumePdfBase64,
+              resumePdfMimeType,
+              resumePdfName,
               existingQuestions: getExistingQuestionsForApi(),
             }),
           });
@@ -1576,7 +1589,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 </div>
                 <h1 class="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">AI 이력서 분석</h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  주요업무, 필수자격/필요경험, 우대사항, 핵심역량을 기준으로 이력서를 분석합니다.<br class="hidden sm:block"> 이력서 원본은 저장되지 않으며, 하단의 구조화면접 가이드에 추가 버튼 클릭 시 선택한 질문과 AI 브리프가 후보자 세션에 저장됩니다.
+                  주요업무, 필수자격/필요경험, 우대사항, 핵심역량을 기준으로 PDF 이력서 원본을 분석합니다.<br class="hidden sm:block"> 이력서 원본은 저장되지 않으며, 하단의 구조화면접 가이드에 추가 버튼 클릭 시 선택한 질문과 AI 브리프가 후보자 세션에 저장됩니다.
                 </p>
               </div>
               <a href="index.html" class="rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur">
@@ -1618,8 +1631,8 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                   </label>
 
                   <label class="mt-4 block text-sm font-semibold text-slate-700">
-                    이력서 텍스트 확인/직접 붙여넣기
-                    <textarea class="mt-2 h-48 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400" placeholder="PDF에서 추출된 텍스트가 여기에 표시됩니다. 이미지형 PDF는 텍스트를 직접 붙여넣어 주세요." oninput="resumeText = this.value">${escapeHtml(resumeText)}</textarea>
+                    이력서 텍스트 직접 붙여넣기 <span class="font-normal text-slate-400">(PDF 업로드가 어려운 경우)</span>
+                    <textarea class="mt-2 h-48 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400" placeholder="기본 방식은 PDF 원본 업로드입니다. PDF 업로드가 어려운 경우에만 이력서 텍스트를 직접 붙여넣어 주세요." oninput="resumePdfBase64 = ''; resumePdfName = ''; resumeText = this.value">${escapeHtml(resumeText)}</textarea>
                   </label>
                 </section>
 
@@ -1631,7 +1644,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
 
                   <div class="mt-5 grid gap-2">
                     <button onclick="analyzeResume()" class="rounded-full bg-[linear-gradient(90deg,#3b82f6,#69a4ff)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.25)] transition hover:scale-[1.01] disabled:opacity-50" ${isAnalyzing || isPdfParsing || !contextReady ? "disabled" : ""}>
-                      ${isAnalyzing ? "AI 분석 중..." : isPdfParsing ? "PDF 읽는 중..." : contextReady ? "AI 분석하기" : "분석 기준 등록 후 분석 가능"}
+                      ${isAnalyzing ? "AI 분석 중..." : isPdfParsing ? "PDF 준비 중..." : contextReady ? "AI 분석하기" : "분석 기준 등록 후 분석 가능"}
                     </button>
                   </div>
 
