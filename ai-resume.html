@@ -50,12 +50,22 @@
 
     <script src="interview-data.js"></script>
     <script>
+      const VERCEL_APP_URL = "https://interview-guide-roan.vercel.app";
+
+      if (window.location.hostname.includes("github.io")) {
+        const currentPath = window.location.pathname || "/";
+        const currentSearch = window.location.search || "";
+        const currentHash = window.location.hash || "";
+        const normalizedPath = currentPath.replace(/^\/interview-guide/, "") || "/";
+        window.location.replace(`${VERCEL_APP_URL}${normalizedPath}${currentSearch}${currentHash}`);
+      }
+
       if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
       }
 
       const app = document.getElementById("app");
-      const POSITION_CONTEXT_STORAGE_KEY = "dozn_ai_position_contexts_v1";
+      const POSITION_CONTEXT_CACHE_KEY = "dozn_ai_position_contexts_cache_v1";
       const CANDIDATE_STORAGE_KEY = "dozn_interview_candidates_v1";
       const CUSTOM_QUESTION_STORAGE_KEY = "dozn_interview_custom_questions_v2";
       const ANALYSIS_HISTORY_STORAGE_KEY = "dozn_ai_resume_analysis_history_v1";
@@ -72,6 +82,10 @@
       let currentAnalysisHistoryId = "";
       let isPositionContextOpen = false;
       let isHrEditMode = false;
+      let hrEditPassword = "";
+      let positionContextCache = {};
+      let positionContextLoading = {};
+      let positionContextError = {};
 
       function getSelectedPosition() {
         return window.INTERVIEW_DATA.positions.find((position) => position.id === selectedPositionId) || window.INTERVIEW_DATA.positions[0];
@@ -121,21 +135,59 @@
         };
       }
 
-      function getAllPositionContexts() {
+      function getCachedPositionContexts() {
         try {
-          return JSON.parse(localStorage.getItem(POSITION_CONTEXT_STORAGE_KEY)) || {};
+          return JSON.parse(localStorage.getItem(POSITION_CONTEXT_CACHE_KEY)) || {};
         } catch (e) {
           return {};
         }
       }
 
-      function setAllPositionContexts(data) {
-        localStorage.setItem(POSITION_CONTEXT_STORAGE_KEY, JSON.stringify(data));
+      function setCachedPositionContexts(data) {
+        localStorage.setItem(POSITION_CONTEXT_CACHE_KEY, JSON.stringify(data));
+      }
+
+      function hydratePositionContextCache() {
+        positionContextCache = getCachedPositionContexts();
       }
 
       function getStoredPositionContext(positionId = selectedPositionId) {
-        const all = getAllPositionContexts();
-        return all[positionId] || null;
+        return positionContextCache[positionId] || null;
+      }
+
+      async function loadPositionContext(positionId = selectedPositionId, options = {}) {
+        const force = Boolean(options.force);
+        if (!positionId) return null;
+        if (!force && positionContextCache[positionId]) return positionContextCache[positionId];
+        if (positionContextLoading[positionId]) return null;
+
+        positionContextLoading[positionId] = true;
+        positionContextError[positionId] = "";
+
+        try {
+          const response = await fetch(`/api/position-criteria?positionId=${encodeURIComponent(positionId)}`);
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(data.error || "포지션 분석 기준을 불러오지 못했습니다.");
+          }
+
+          if (data.criteria) {
+            positionContextCache[positionId] = data.criteria;
+          } else {
+            delete positionContextCache[positionId];
+          }
+
+          setCachedPositionContexts(positionContextCache);
+          return data.criteria || null;
+        } catch (error) {
+          positionContextError[positionId] = error.message || "포지션 분석 기준을 불러오지 못했습니다.";
+          return null;
+        } finally {
+          positionContextLoading[positionId] = false;
+          contextDraft = null;
+          render();
+        }
       }
 
       function getContextDraft() {
@@ -147,7 +199,6 @@
             ...stored,
           };
 
-          // 이전 버전에서 JD 칸에 입력해둔 내용이 있다면 주요업무 칸으로 임시 표시합니다.
           if (!contextDraft.keyTasks && stored.jd) {
             contextDraft.keyTasks = stored.jd;
           }
@@ -166,29 +217,56 @@
         draft[field] = value;
       }
 
-      function savePositionContext() {
+      async function savePositionContext() {
         const draft = getContextDraft();
         if (!draft.keyTasks.trim()) {
           alert("주요업무를 입력해주세요.");
           return;
         }
 
-        const all = getAllPositionContexts();
-        all[selectedPositionId] = {
-          keyTasks: draft.keyTasks.trim(),
-          requiredQualifications: draft.requiredQualifications.trim(),
-          preferredQualifications: draft.preferredQualifications.trim(),
-          coreCompetencies: draft.coreCompetencies.trim(),
-          updatedAt: formatDate(),
-        };
-        setAllPositionContexts(all);
-        contextDraft = { positionId: selectedPositionId, ...all[selectedPositionId] };
-        alert("포지션 분석 기준이 저장되었습니다.");
-        render();
+        if (!hrEditPassword) {
+          const password = prompt("HR 수정 비밀번호를 입력해주세요.");
+          if (!password) return;
+          hrEditPassword = password;
+        }
+
+        try {
+          const selected = getSelectedPosition();
+          const response = await fetch("/api/position-criteria", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-hr-password": hrEditPassword,
+            },
+            body: JSON.stringify({
+              positionId: selectedPositionId,
+              positionName: selected?.name || selectedPositionId,
+              keyTasks: draft.keyTasks.trim(),
+              requiredQualifications: draft.requiredQualifications.trim(),
+              preferredQualifications: draft.preferredQualifications.trim(),
+              coreCompetencies: draft.coreCompetencies.trim(),
+            }),
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            if (response.status === 401) hrEditPassword = "";
+            throw new Error(data.error || "포지션 분석 기준 저장에 실패했습니다.");
+          }
+
+          positionContextCache[selectedPositionId] = data.criteria;
+          setCachedPositionContexts(positionContextCache);
+          contextDraft = { positionId: selectedPositionId, ...data.criteria };
+          isHrEditMode = false;
+          alert("포지션 분석 기준이 저장되었습니다. 모든 면접관에게 동일하게 표시됩니다.");
+          render();
+        } catch (error) {
+          alert(error.message || "포지션 분석 기준 저장에 실패했습니다.");
+        }
       }
 
       function resetPositionContextDraft() {
-        const ok = confirm("현재 입력 중인 포지션 컨텍스트를 저장된 내용으로 되돌릴까요?");
+        const ok = confirm("현재 입력 중인 포지션 분석 기준을 저장된 내용으로 되돌릴까요?");
         if (!ok) return;
         contextDraft = null;
         render();
@@ -344,6 +422,7 @@
         errorMessage = "";
         contextDraft = null;
         render();
+        loadPositionContext(selectedPositionId);
         setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
       }
 
@@ -1172,8 +1251,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
       }
 
       function enableHrEditMode() {
-        const ok = confirm("포지션 분석 기준은 HR에서 관리하는 항목입니다. 수정 모드로 전환하시겠습니까?");
-        if (!ok) return;
+        const password = prompt("포지션 분석 기준은 HR에서 관리하는 항목입니다.\n수정하려면 HR 수정 비밀번호를 입력해주세요.");
+        if (!password) return;
+        hrEditPassword = password;
         isPositionContextOpen = true;
         isHrEditMode = true;
         render();
@@ -1182,6 +1262,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
       function cancelHrEditMode() {
         contextDraft = null;
         isHrEditMode = false;
+        hrEditPassword = "";
         render();
       }
 
@@ -1190,6 +1271,8 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         const draft = getContextDraft();
         const stored = getStoredPositionContext(selectedPositionId);
         const isSaved = hasRequiredPositionContext();
+        const isLoading = Boolean(positionContextLoading[selectedPositionId]);
+        const loadError = positionContextError[selectedPositionId] || "";
         const displayContext = {
           ...getDefaultContext(selected),
           ...(stored || {}),
@@ -1208,14 +1291,14 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             <div class="flex items-start justify-between gap-3 ${isPositionContextOpen ? "border-b border-slate-100 pb-4" : ""}">
               <div>
                 <p class="text-sm font-medium ${isSaved ? "text-blue-600" : "text-amber-700"}">포지션 분석 기준</p>
-                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)}</h2>
+                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준</h2>
                 <p class="mt-2 text-xs leading-5 text-slate-500">
-                  AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 등록 예정으로, 개별적으로 등록하거나, 임의로 수정하지 말아주세요.
+                  AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 공통으로 등록하며, 모든 면접관에게 동일하게 표시됩니다.
                 </p>
               </div>
               <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <span class="rounded-full ${isSaved ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"} px-3 py-1 text-xs font-semibold">
-                  ${isSaved ? "등록됨" : "분석 기준 등록 필요"}
+                  ${isLoading ? "불러오는 중" : isSaved ? "등록됨" : "분석 기준 등록 필요"}
                 </span>
                 <button onclick="togglePositionContextOpen()" class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                   ${isPositionContextOpen ? "접기" : "보기"}
@@ -1224,6 +1307,8 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             </div>
 
             ${!isPositionContextOpen ? "" : `
+              ${isLoading ? `<div class="mt-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">포지션 분석 기준을 불러오는 중입니다.</div>` : ""}
+              ${loadError ? `<div class="mt-5 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">${escapeHtml(loadError)}</div>` : ""}
               ${!isHrEditMode ? `
                 <div class="mt-5 grid gap-3">
                   ${renderReadOnlyBlock("주요업무", displayContext.keyTasks, true)}
@@ -1349,7 +1434,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           return `
             <div class="rounded-[28px] border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
               <p class="text-sm font-semibold text-slate-700">아직 분석 결과가 없습니다.</p>
-              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면<br>지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
+              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면 지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
             </div>
           `;
         }
@@ -1472,7 +1557,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
         currentAnalysisHistoryId = "";
         isPositionContextOpen = false;
         isHrEditMode = false;
+        hrEditPassword = "";
         render();
+        loadPositionContext(selectedPositionId);
       }
 
       function render() {
@@ -1539,7 +1626,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <h2 class="text-xl font-semibold text-slate-900">이력서 AI 분석</h2>
                   <p class="mt-2 text-xs leading-5 text-slate-500">
-                    <span class="font-semibold text-slate-800">분석 횟수에 따라 토큰이 차감됩니다.</span><br>무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
+                    <span class="font-semibold text-slate-800">분석 횟수에 따라 토큰이 차감됩니다.</span> 무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
                   </p>
 
                   <div class="mt-5 grid gap-2">
@@ -1568,7 +1655,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                       </span>
                     </div>
                   </div>
-                  ${!contextReady ? `<div class="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">해당 포지션의 분석 기준이 아직 등록되지 않았습니다. HR팀에 문의해주세요.</div>` : ""}
+                  ${!contextReady ? `<div class="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">해당 포지션의 분석 기준이 아직 등록되지 않았습니다. HR팀에서 기준을 등록한 후 분석을 진행해주세요.</div>` : ""}
                   ${errorMessage ? `<div class="mb-5 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">${escapeHtml(errorMessage)}</div>` : ""}
                   ${renderAnalysisCards()}
                 </section>
@@ -1615,7 +1702,9 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
       window.resetPositionContextDraft = resetPositionContextDraft;
       window.selectPosition = selectPosition;
 
+      hydratePositionContextCache();
       render();
+      loadPositionContext(selectedPositionId);
     </script>
   </body>
 </html>
