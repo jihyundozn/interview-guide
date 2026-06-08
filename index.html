@@ -696,7 +696,7 @@
         return String(value || "")
           .replace(/\[[0-9]+p\]/gi, "")
           .replace(/<PARSED TEXT[^>]*>/gi, "")
-          .replace(/[  ]+/g, "")
+          .replace(/\s{2,}/g, " ")
           .replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => `“${inner.replace(/\s+/g, " ").trim().slice(0, 45)}...”`)
           .replace(/(\d+)\s*\/\s*100\s*종합\s*적합도\s*[\.:：-]?/gi, "")
           .replace(/(Java\s*\/\s*Spring|TypeScript|Next\.js|React|Node\.js|Python)\s*기반\s*[가-힣A-Za-z0-9|·\s]{0,35}\|?\s*경력\s*\d+\s*년\s*\d*\s*개월?/gi, "")
@@ -746,11 +746,12 @@
       }
 
       function displayAnalysisText(value) {
+        // 서버에서 이미 문장을 정리하므로, 프론트에서는 기술명/한글 사이를 임의로 쪼개지 않습니다.
+        // Java와, TypeScript와, Next.js 같은 표현이 깨지는 문제를 막기 위한 최소 표시 함수입니다.
         return shortenLongQuotedText(value)
-          .replace(/([가-힣])([A-Za-z])/g, "$1 $2")
-          .replace(/([A-Za-z])([가-힣])/g, "$1 $2")
-          .replace(/(TypeScript|Next\.js|Java\/Spring|Spring|React|API|TCP|REST API|Redis|AWS|DB|ORM)(?=[가-힣])/g, "$1 ")
-          .replace(/([가-힣])(기반|경험|역량|업무|개발|설계|운영|분석|관리|능력|이해|확인|필요|수행|프로젝트|서비스|시스템)/g, "$1 $2")
+          .replace(/RESTAPI/g, "REST API")
+          .replace(/OCRAPI/g, "OCR API")
+          .replace(/Next\.\s+js/g, "Next.js")
           .replace(/\s{2,}/g, " ")
           .trim();
       }
