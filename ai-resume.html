@@ -1574,7 +1574,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
             <div class="flex items-start justify-between gap-3 ${isPositionContextOpen ? "border-b border-slate-100 pb-4" : ""}">
               <div>
                 <p class="text-sm font-medium ${isSaved ? "text-blue-600" : "text-amber-700"}">포지션 분석 기준</p>
-                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)} 분석 기준</h2>
+                <h2 class="mt-1 text-xl font-semibold text-slate-900">${escapeHtml(selected.name)}</h2>
                 <p class="mt-2 text-xs leading-5 text-slate-500">
                   AI 분석은 아래 4가지 정보를 기준으로 진행됩니다.<br>해당 내용은 HR에서 공통으로 등록하며, 모든 면접관에게 동일하게 표시됩니다.
                 </p>
@@ -1717,7 +1717,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
           return `
             <div class="rounded-[28px] border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
               <p class="text-sm font-semibold text-slate-700">아직 분석 결과가 없습니다.</p>
-              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면 지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
+              <p class="mt-2 text-sm text-slate-500">포지션 분석 기준을 저장한 뒤 PDF를 업로드하고 AI 분석을 실행하면<br>지원자 요약, JD 역량 적합도, 검증 포인트가 표시됩니다.</p>
             </div>
           `;
         }
@@ -1909,7 +1909,7 @@ ${cleanResumeTextForPrompt(resumeText).slice(0, 30000)}`;
                 <section class="rounded-[32px] border border-white/70 bg-white/85 p-6 shadow-sm backdrop-blur">
                   <h2 class="text-xl font-semibold text-slate-900">이력서 AI 분석</h2>
                   <p class="mt-2 text-xs leading-5 text-slate-500">
-                    <span class="font-semibold text-slate-800">분석 횟수에 따라 토큰이 차감됩니다.</span> 무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
+                    <span class="font-semibold text-slate-800">분석 횟수에 따라 토큰이 차감됩니다.</span><br>무분별한 분석은 지양해주시고, 실제 면접 대상자의 이력서만 분석해주세요.
                   </p>
 
                   <div class="mt-5 grid gap-2">
