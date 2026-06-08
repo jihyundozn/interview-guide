@@ -693,71 +693,32 @@
       }
 
       function cleanupGeneratedText(value) {
-        let text = String(value || "");
-        const replacements = [
-          ["RESTAPI", "REST API"],
-          ["OCRAPI", "OCR API"],
-          ["Next. js", "Next.js"],
-          ["Next .js", "Next.js"],
-          ["Node. js", "Node.js"],
-          ["Node .js", "Node.js"],
-          ["Java 와", "Java와"],
-          ["Spring 과", "Spring과"],
-          ["TypeScript 와", "TypeScript와"],
-          ["React 와", "React와"],
-          ["Java와SpringBoot", "Java와 SpringBoot"],
-          ["Java와Spring", "Java와 Spring"],
-          ["TypeScript와Next.js", "TypeScript와 Next.js"],
-          ["TypeScript와Next. js", "TypeScript와 Next.js"],
-          ["SpringBoot를활용한", "SpringBoot를 활용한"],
-          ["SpringBoot를활용", "SpringBoot를 활용"],
-          ["3년이상의", "3년 이상의"],
-          ["이상의백엔드", "이상의 백엔드"],
-          ["백엔드개발", "백엔드 개발"],
-          ["프론트엔드개발", "프론트엔드 개발"],
-          ["서비스개발", "서비스 개발"],
-          ["시스템개발", "시스템 개발"],
-          ["웹시스템", "웹 시스템"],
-          ["데이터베이스모델링", "데이터베이스 모델링"],
-          ["외부시스템연동", "외부 시스템 연동"],
-          ["요구사항분석", "요구사항 분석"],
-          ["업무계획", "업무 계획"],
-          ["일정관리", "일정 관리"],
-          ["성능최적화", "성능 최적화"],
-          ["운영환경", "운영 환경"],
-          ["CI/CD환경구축경험", "CI/CD 환경 구축 경험"],
-          ["CI/CD환경구축", "CI/CD 환경 구축"],
-          ["CI/CD환경", "CI/CD 환경"],
-          ["프로젝트경험", "프로젝트 경험"],
-          ["다양한프로젝트", "다양한 프로젝트"],
-          ["관련경험", "관련 경험"],
-          ["확인이필요", "확인이 필요"],
-          ["보유하고있", "보유하고 있"],
-          ["갖추고있", "갖추고 있"],
-          ["활용한다양한", "활용한 다양한"],
-          ["커뮤니케이션능력", "커뮤니케이션 능력"],
-          ["협업능력", "협업 능력"],
-          ["본인이맡은역할", "본인이 맡은 역할"],
-          ["설명해주세요", "설명해 주세요"],
-          ["말씀해주세요", "말씀해 주세요"],
-          ["확인해주세요", "확인해 주세요"],
-        ];
-        replacements.forEach(([from, to]) => {
-          text = text.replaceAll(from, to);
-        });
-        return text
+        return String(value || "")
           .replace(/\[[0-9]+p\]/gi, "")
           .replace(/<PARSED TEXT[^>]*>/gi, "")
-          .replace(/\u00a0/g, " ")
-          .replace(/([가-힣]{2,4})지원자는/g, "$1 지원자는")
-          .replace(/지원자는(?=[0-9A-Za-z가-힣])/g, "지원자는 ")
-          .replace(/(\d+)년(\d+)개월/g, "$1년 $2개월")
-          .replace(/(\d+년)\s*이상/g, "$1 이상")
-          .replace(/(경험|경력|요건|능력|강점|문제|역할|프로젝트|시스템|환경|설계|모델링|구축|포지션)(은|는|이|가|을|를|에|에서|의|와|과)(?=[0-9A-Za-z가-힣])/g, "$1$2 ")
+          .replace(/[  ]+/g, "")
+          .replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => `“${inner.replace(/\s+/g, " ").trim().slice(0, 45)}...”`)
+          .replace(/(\d+)\s*\/\s*100\s*종합\s*적합도\s*[\.:：-]?/gi, "")
+          .replace(/(Java\s*\/\s*Spring|TypeScript|Next\.js|React|Node\.js|Python)\s*기반\s*[가-힣A-Za-z0-9|·\s]{0,35}\|?\s*경력\s*\d+\s*년\s*\d*\s*개월?/gi, "")
+          .replace(/이력서에서는\s*/g, "")
+          .replace(/내용이\s*우선적으로\s*확인되며,?/g, "")
+          .replace(/필수자격\/필요경험\s*중\s*/g, "")
+          .replace(/요건과\s*연결되는\s*정황/g, "관련 경험으로 볼 수 있는 단서")
+          .replace(/경험은\s*실질적\s*변화를\s*만든\s*사례로\s*볼\s*여지가\s*있습니다/g, "실질적인 개선 경험으로 해석할 수 있습니다")
+          .replace(/또한(?=[A-Za-z가-힣])/g, "")
           .replace(/,(?=\S)/g, ", ")
-          .replace(/([.!?])(?=[가-힣A-Za-z0-9])/g, "$1 ")
-          .replace(/[ \t]{2,}/g, " ")
+          .replace(/\.(?=\S)/g, ". ")
+          .replace(/\)(?=\S)/g, ") ")
+          .replace(/([가-힣])\|([가-힣])/g, "$1 / $2")
+          .replace(/\s{2,}/g, " ")
           .trim();
+      }
+
+      function shortenLongQuotedText(value) {
+        return cleanupGeneratedText(value).replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => {
+          const compact = inner.replace(/\s+/g, " ").trim();
+          return `“${compact.slice(0, 45)}...”`;
+        });
       }
 
       function getJdFitEvidenceKey(index) {
@@ -785,7 +746,13 @@
       }
 
       function displayAnalysisText(value) {
-        return shortenLongQuotedText(value);
+        return shortenLongQuotedText(value)
+          .replace(/([가-힣])([A-Za-z])/g, "$1 $2")
+          .replace(/([A-Za-z])([가-힣])/g, "$1 $2")
+          .replace(/(TypeScript|Next\.js|Java\/Spring|Spring|React|API|TCP|REST API|Redis|AWS|DB|ORM)(?=[가-힣])/g, "$1 ")
+          .replace(/([가-힣])(기반|경험|역량|업무|개발|설계|운영|분석|관리|능력|이해|확인|필요|수행|프로젝트|서비스|시스템)/g, "$1 $2")
+          .replace(/\s{2,}/g, " ")
+          .trim();
       }
 
       function nl2br(value) {
@@ -2338,6 +2305,60 @@ function renderPdfPreview() {
       window.updateNewCandidateName = updateNewCandidateName;
       window.addCandidateDirectly = addCandidateDirectly;
       window.deleteCandidate = deleteCandidate;
+
+      // ===== Phase 45: AI 브리프/질문 표시 안정화 =====
+      // AI 분석 페이지에서 저장한 문장을 구조화면접 가이드에서 다시 훼손하지 않도록 최소 보정만 수행합니다.
+      function cleanupGeneratedText(value) {
+        let text = String(value || "");
+        const replacements = [
+          ["RESTAPI", "REST API"],
+          ["OCRAPI", "OCR API"],
+          ["Next. js", "Next.js"],
+          ["Next .js", "Next.js"],
+          ["Java 와", "Java와"],
+          ["Spring 과", "Spring과"],
+          ["TypeScript 와", "TypeScript와"],
+          ["React 와", "React와"],
+          ["Java와SpringBoot", "Java와 SpringBoot"],
+          ["TypeScript와Next.js", "TypeScript와 Next.js"],
+          ["TypeScript와Next. js", "TypeScript와 Next.js"],
+          ["백엔드개발", "백엔드 개발"],
+          ["프론트엔드개발", "프론트엔드 개발"],
+          ["데이터베이스모델링", "데이터베이스 모델링"],
+          ["요구사항분석", "요구사항 분석"],
+          ["외부시스템연동", "외부 시스템 연동"],
+          ["CI/CD환경", "CI/CD 환경"],
+          ["설명해주세요", "설명해 주세요"],
+          ["말씀해주세요", "말씀해 주세요"],
+          ["확인해주세요", "확인해 주세요"],
+        ];
+        replacements.forEach(([from, to]) => { text = text.replaceAll(from, to); });
+        return text
+          .replace(/\[[0-9]+p\]/gi, "")
+          .replace(/<PARSED TEXT[^>]*>/gi, "")
+          .replace(/(\d+)\s*\/\s*100\s*종합\s*적합도\s*[\.:：-]?/gi, "")
+          .replace(/이력서에서는\s*/g, "")
+          .replace(/내용이\s*우선적으로\s*확인되며,?/g, "")
+          .replace(/필수자격\/필요경험\s*중\s*/g, "")
+          .replace(/,(?=\S)/g, ", ")
+          .replace(/\.([가-힣A-Z])/g, ". $1")
+          .replace(/\)(?=\S)/g, ") ")
+          .replace(/([가-힣])\|([가-힣])/g, "$1 / $2")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+      }
+
+      function shortenLongQuotedText(value) {
+        return cleanupGeneratedText(value).replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => {
+          const compact = inner.replace(/\s+/g, " ").trim();
+          return `“${compact.slice(0, 45)}...”`;
+        });
+      }
+
+      function displayAnalysisText(value) {
+        return shortenLongQuotedText(value);
+      }
+
       window.goAiResumeAnalysis = goAiResumeAnalysis;
       window.goLanding = goLanding;
       window.scrollToSection = scrollToSection;
