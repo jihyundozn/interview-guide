@@ -702,6 +702,54 @@
         };
       }
 
+
+
+      // ===== Phase 39: 안전 표시용 문장 정리 =====
+      // 서버에서 이미 GPT가 문장을 작성하므로, 프론트에서는 결과를 과하게 재가공하지 않습니다.
+      // 특히 Java와/TypeScript와/Next.js 같은 기술명 표현을 망가뜨리던 범용 정규식은 사용하지 않습니다.
+      function cleanupGeneratedText(value) {
+        let text = String(value || "");
+        const replacements = [
+          ["RESTAPI", "REST API"],
+          ["OCRAPI", "OCR API"],
+          ["Next. js", "Next.js"],
+          ["Next .js", "Next.js"],
+          ["Java 와", "Java와"],
+          ["Spring 과", "Spring과"],
+          ["TypeScript 와", "TypeScript와"],
+          ["React 와", "React와"],
+          ["백엔드개발", "백엔드 개발"],
+          ["프론트엔드개발", "프론트엔드 개발"],
+          ["서비스개발", "서비스 개발"],
+          ["시스템개발", "시스템 개발"],
+          ["웹시스템", "웹 시스템"],
+          ["데이터베이스모델링", "데이터베이스 모델링"],
+          ["외부시스템연동", "외부 시스템 연동"],
+          ["요구사항분석", "요구사항 분석"],
+          ["업무계획", "업무 계획"],
+          ["일정관리", "일정 관리"],
+          ["성능최적화", "성능 최적화"],
+          ["운영환경", "운영 환경"],
+          ["커뮤니케이션능력", "커뮤니케이션 능력"],
+          ["협업능력", "협업 능력"],
+          ["본인이맡은역할", "본인이 맡은 역할"],
+          ["설명해주세요", "설명해 주세요"],
+          ["말씀해주세요", "말씀해 주세요"],
+          ["확인해주세요", "확인해 주세요"],
+        ];
+        replacements.forEach(([from, to]) => {
+          text = text.replaceAll(from, to);
+        });
+        return text
+          .replace(/\[[0-9]+p\]/gi, "")
+          .replace(/[  ]+/g, "")
+          .replace(/([가-힣]{2,4})지원자는/g, "$1 지원자는")
+          .replace(/(\d+)년(\d+)개월/g, "$1년 $2개월")
+          .replace(/,(?=\S)/g, ", ")
+          .replace(/\s{2,}/g, " ")
+          .trim();
+      }
+
       function normalizeExtractedPdfText(value) {
         return fixJoinedKoreanResumeText(String(value || "")
           .replace(/\u00a0/g, " ")
