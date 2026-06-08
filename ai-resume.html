@@ -855,19 +855,29 @@
         const buffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
         const images = [];
-        const maxPages = Math.min(pdf.numPages, 10);
+        // 최대 6페이지 (이력서는 보통 2~3페이지)
+        const maxPages = Math.min(pdf.numPages, 6);
         for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
           const page = await pdf.getPage(pageNo);
-          const scale = 2.0;
+          // scale 1.5로 낮춤: 텍스트 인식에 충분하면서 용량 절감
+          // scale 2.0 대비 약 56% 용량 감소
+          const scale = 1.5;
           const viewport = page.getViewport({ scale });
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           const ctx = canvas.getContext("2d");
           await page.render({ canvasContext: ctx, viewport }).promise;
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+          // JPEG quality 0.75: 텍스트 가독성 유지하면서 용량 대폭 절감
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
           const base64 = dataUrl.split(",")[1];
-          images.push(base64);
+          // 페이지당 최대 600KB (base64 기준 ~800KB) 초과 시 quality 낮춰서 재시도
+          if (base64.length > 800000) {
+            const smallerDataUrl = canvas.toDataURL("image/jpeg", 0.5);
+            images.push(smallerDataUrl.split(",")[1]);
+          } else {
+            images.push(base64);
+          }
         }
         return images;
       }
