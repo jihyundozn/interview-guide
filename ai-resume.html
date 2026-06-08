@@ -794,12 +794,18 @@
           const items = (content.items || [])
             .map((item) => {
               const transform = item.transform || [];
+              const fontSize = Math.abs(transform[3]) || Math.abs(transform[0]) || 10;
+              const rawWidth = Number(item.width || 0);
+              // width=0 보정: 글자 수 × fontSize × 0.6 을 추정폭으로 사용
+              // 한국어 PDF는 글자별 width가 0으로 보고되는 경우가 많아 공백 판단이 실패함
+              const estimatedWidth = String(item.str || "").length * fontSize * 0.6;
+              const width = rawWidth > 1 ? rawWidth : estimatedWidth;
               return {
                 text: String(item.str || ""),
                 x: Number(transform[4] || 0),
                 y: Number(transform[5] || 0),
-                width: Number(item.width || 0),
-                height: Number(item.height || Math.abs(transform[3]) || 10),
+                width,
+                height: fontSize,
               };
             })
             .filter((item) => item.text.trim());
@@ -826,7 +832,9 @@
 
             if (previous) {
               const gap = item.x - (previous.x + previous.width);
-              const needsSpace = gap > Math.max(previous.height, item.height, 10) * 0.18;
+              // 임계값을 fontSize 기준 0.25로 조정 (기존 0.18보다 보수적으로)
+              const spaceThreshold = Math.max(previous.height, item.height, 10) * 0.25;
+              const needsSpace = gap > spaceThreshold;
               if (needsSpace && !/\s$/.test(line)) line += " ";
             }
 
