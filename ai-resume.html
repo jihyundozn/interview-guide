@@ -904,33 +904,24 @@
         resumePdfBase64 = "";
         resumePdfImages = [];
         resumePdfName = file.name;
-        resumePdfMimeType = "image/jpeg";
+        resumePdfMimeType = "application/pdf";
         render();
 
         try {
-          const images = await renderPdfToImages(file).catch((error) => {
-            console.warn("PDF image rendering failed:", error);
-            return [];
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = String(reader.result || "");
+              resolve(result.includes(",") ? result.split(",")[1] : result);
+            };
+            reader.onerror = () => reject(reader.error || new Error("파일을 읽지 못했습니다."));
+            reader.readAsDataURL(file);
           });
 
-          if (images.length > 0) {
-            resumePdfImages = images;
-            resumeText = `PDF를 이미지로 변환했습니다. (${file.name}, ${images.length}페이지)\nGemini가 이미지를 직접 읽어 분석합니다.`;
-          } else {
-            // 이미지 변환 실패 시 PDF base64로 폴백
-            const base64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = String(reader.result || "");
-                resolve(result.includes(",") ? result.split(",")[1] : result);
-              };
-              reader.onerror = () => reject(reader.error || new Error("파일을 읽지 못했습니다."));
-              reader.readAsDataURL(file);
-            });
-            resumePdfBase64 = base64;
-            resumePdfMimeType = file.type || "application/pdf";
-            resumeText = `PDF 원본 파일이 업로드되었습니다. (${file.name})`;
-          }
+          resumePdfBase64 = base64;
+          resumePdfImages = [];
+          resumePdfMimeType = file.type || "application/pdf";
+          resumeText = `PDF 원본 파일이 업로드되었습니다. (${file.name})\nGPT-4o가 PDF의 텍스트 레이어와 시각적 렌더링을 함께 읽어 분석합니다.`;
         } catch (error) {
           console.error(error);
           errorMessage = "PDF 파일을 읽는 중 오류가 발생했습니다. 다시 업로드해 주세요.";
