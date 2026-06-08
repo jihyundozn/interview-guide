@@ -598,7 +598,7 @@
         return text
           .replace(/\[[0-9]+p\]/gi, "")
           .replace(/<PARSED TEXT[^>]*>/gi, "")
-          .replace(/[  ]+/g, "")
+          .replace(/\s{2,}/g, " ")
           .replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => `“${inner.replace(/\s+/g, " ").trim().slice(0, 45)}...”`)
           .replace(/(\d+)\s*\/\s*100\s*종합\s*적합도\s*[\.:：-]?/gi, "")
           .replace(/\b(Java\s*\/\s*Spring|TypeScript|Next\.js|React|Node\.js|Python)\s*기반\s*[가-힣A-Za-z0-9|·\s]{0,35}\|?\s*경력\s*\d+\s*년\s*\d*\s*개월?/gi, "")
@@ -633,7 +633,7 @@
       function cleanResumeTextForPrompt(value) {
         return String(value || "")
           .replace(/\[[0-9]+p\]/gi, "")
-          .replace(/[  ]+/g, "")
+          .replace(/\s{2,}/g, " ")
           .replace(/기\s+반/g, "기반")
           .replace(/백\s+엔\s+드/g, "백엔드")
           .replace(/프\s+론\s+트\s+엔\s+드/g, "프론트엔드")
@@ -759,7 +759,7 @@
         });
         return text
           .replace(/\[[0-9]+p\]/gi, "")
-          .replace(/[  ]+/g, "")
+          .replace(/\s{2,}/g, " ")
           .replace(/([가-힣]{2,4})지원자는/g, "$1 지원자는")
           .replace(/지원자는(?=[0-9A-Za-z가-힣])/g, "지원자는 ")
           .replace(/(\d+)년(\d+)개월/g, "$1년 $2개월")
@@ -773,7 +773,7 @@
       function normalizeExtractedPdfText(value) {
         return fixJoinedKoreanResumeText(String(value || "")
           .replace(/\u00a0/g, " ")
-          .replace(/[  ]+/g, "")
+          .replace(/\s{2,}/g, " ")
           .replace(/[ \t]+\n/g, "\n")
           .replace(/\n{3,}/g, "\n\n")
           .replace(/([가-힣])([A-Za-z0-9])/g, "$1 $2")
