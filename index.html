@@ -2297,6 +2297,414 @@ function renderPdfPreview() {
 
       window.setSelectedPosition = setSelectedPosition;
       window.startGuide = startGuide;
+
+
+      // === Phase57: Supabase 공통 후보자 목록 연동 ===
+      let remoteCandidatesLoaded = false;
+      let remoteCandidatesLoading = false;
+      let remoteCandidatesCache = [];
+
+      function normalizePositionCompare(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/개발자/g, "개발")
+          .replace(/[\s_\-\/]+/g, "")
+          .trim();
+      }
+
+      function getLocalCandidatesForPosition(positionId = selectedPositionId) {
+        const allCandidates = getAllCandidates();
+        return allCandidates[positionId] || [];
+      }
+
+      function getRemoteLatestAnalysis(remoteCandidate) {
+        const analyses = Array.isArray(remoteCandidate?.ai_resume_analyses)
+          ? [...remoteCandidate.ai_resume_analyses]
+          : [];
+
+        if (!analyses.length) return null;
+
+        const latestId = remoteCandidate.latest_analysis_id;
+        const matched = latestId ? analyses.find((item) => item.id === latestId) : null;
+        if (matched) return matched;
+
+        analyses.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        return analyses[0] || null;
+      }
+
+      function getRemoteAnalysisResult(remoteCandidate) {
+        const latestAnalysis = getRemoteLatestAnalysis(remoteCandidate);
+        return latestAnalysis?.analysis_result || {};
+      }
+
+      function buildAiBriefFromAnalysis(result = {}, latestAnalysis = null) {
+        return {
+          ...getDefaultAiBrief(),
+          overallFitScore:
+            result.overallFitScore ??
+            result.overall_fit_score ??
+            latestAnalysis?.overall_fit_score ??
+            null,
+          summary: result.summary || "",
+          jdFit: Array.isArray(result.jdFit) ? result.jdFit : [],
+          strengths: Array.isArray(result.strengths) ? result.strengths : [],
+          concerns: Array.isArray(result.concerns) ? result.concerns : [],
+          verificationPoints: Array.isArray(result.verificationPoints)
+            ? result.verificationPoints
+            : [],
+        };
+      }
+
+      function getRemoteCandidateQuestions(remoteCandidate) {
+        const latestAnalysis = getRemoteLatestAnalysis(remoteCandidate);
+        const result = latestAnalysis?.analysis_result || {};
+
+        const candidates = [
+          result.customQuestions,
+          result.selectedQuestions,
+          result.selected_questions,
+          latestAnalysis?.selected_questions,
+        ];
+
+        for (const item of candidates) {
+          if (Array.isArray(item) && item.length) return item;
+        }
+
+        return [];
+      }
+
+      function remoteCandidateMatchesPosition(remoteCandidate, positionId = selectedPositionId) {
+        const selected = window.INTERVIEW_DATA.positions.find((position) => position.id === positionId);
+        const currentKeys = [
+          positionId,
+          selected?.id,
+          selected?.name,
+        ].map(normalizePositionCompare).filter(Boolean);
+
+        const remoteKey = normalizePositionCompare(remoteCandidate?.position_title);
+        return currentKeys.some((key) => key === remoteKey || key.includes(remoteKey) || remoteKey.includes(key));
+      }
+
+      function normalizeRemoteCandidate(remoteCandidate) {
+        const latestAnalysis = getRemoteLatestAnalysis(remoteCandidate);
+        const result = latestAnalysis?.analysis_result || {};
+
+        return normalizeCandidate({
+          id: remoteCandidate.id,
+          name: remoteCandidate.candidate_name || remoteCandidate.name,
+          createdAt: remoteCandidate.created_at ? formatDraftDate(new Date(remoteCandidate.created_at)) : formatDraftDate(),
+          aiBrief: buildAiBriefFromAnalysis(result, latestAnalysis),
+          remoteCandidateId: remoteCandidate.id,
+          remoteAnalysisId: latestAnalysis?.id || remoteCandidate.latest_analysis_id || null,
+          remotePositionTitle: remoteCandidate.position_title,
+          isAddedToGuide: Boolean(remoteCandidate.is_added_to_guide),
+          source: remoteCandidate.source || "remote",
+          remoteRaw: remoteCandidate,
+        });
+      }
+
+      async function loadRemoteCandidates(force = false) {
+        if (remoteCandidatesLoading) return;
+        if (remoteCandidatesLoaded && !force) return;
+
+        remoteCandidatesLoading = true;
+
+        try {
+          const response = await fetch(`/api/candidates?ts=${Date.now()}`, {
+            method: "GET",
+            cache: "no-store",
+          });
+
+          const payload = await response.json();
+
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || payload.detail || "후보자 목록을 불러오지 못했습니다.");
+          }
+
+          remoteCandidatesCache = Array.isArray(payload.candidates) ? payload.candidates : [];
+          remoteCandidatesLoaded = true;
+        } catch (error) {
+          console.error("[remote-candidates-load-error]", error);
+        } finally {
+          remoteCandidatesLoading = false;
+        }
+      }
+
+      function getCandidatesForPosition(positionId = selectedPositionId) {
+        const localCandidates = getLocalCandidatesForPosition(positionId).map(normalizeCandidate);
+        const remoteCandidates = remoteCandidatesCache
+          .filter((candidate) => remoteCandidateMatchesPosition(candidate, positionId))
+          .map(normalizeRemoteCandidate);
+
+        const merged = [];
+        const seen = new Set();
+
+        for (const candidate of [...remoteCandidates, ...localCandidates]) {
+          const key = candidate.id || `${candidate.name}_${candidate.createdAt}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          merged.push(candidate);
+        }
+
+        return merged;
+      }
+
+      function normalizeCustomQuestion(question) {
+        const type = question.type || "과거 경험 기반";
+        return {
+          id: question.id || `custom_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+          type,
+          main: question.main || "",
+          follow: Array.isArray(question.follow)
+            ? question.follow
+            : question.follow
+              ? [question.follow]
+              : [],
+          points: question.points?.length ? question.points : getCustomQuestionPoints(type),
+          rubric: question.rubric || getCustomQuestionRubric(),
+          intent: question.intent || question.purpose || "",
+          sourceEvidence: question.sourceEvidence || question.evidence || "",
+          relatedCompetency: question.relatedCompetency || question.competency || "",
+          isAiRecommended: question.isAiRecommended ?? true,
+        };
+      }
+
+      function persistCandidateLocally(positionId, candidate) {
+        const allCandidates = getAllCandidates();
+        const candidates = allCandidates[positionId] || [];
+        const normalized = normalizeCandidate(candidate);
+        const existingIndex = candidates.findIndex((item) => item.id === normalized.id);
+
+        if (existingIndex >= 0) {
+          candidates[existingIndex] = {
+            ...candidates[existingIndex],
+            ...normalized,
+            aiBrief: normalized.aiBrief,
+          };
+        } else {
+          candidates.unshift(normalized);
+        }
+
+        allCandidates[positionId] = candidates;
+        setAllCandidates(allCandidates);
+        return normalized;
+      }
+
+      function seedCandidateSession(candidate) {
+        if (!candidate) return;
+
+        persistCandidateLocally(selectedPositionId, candidate);
+
+        const sessionKey = getSessionKey(selectedPositionId, candidate.id);
+        const remoteRaw = candidate.remoteRaw;
+        const remoteQuestions = remoteRaw ? getRemoteCandidateQuestions(remoteRaw) : [];
+
+        if (remoteQuestions.length) {
+          const allCustomQuestions = getAllCustomQuestions();
+          allCustomQuestions[sessionKey] = remoteQuestions.map(normalizeCustomQuestion);
+          setAllCustomQuestions(allCustomQuestions);
+        }
+
+        if (!formStateBySession[sessionKey]) {
+          const defaultState = getDefaultFormState();
+          defaultState.candidateName = candidate.name || "";
+          formStateBySession[sessionKey] = defaultState;
+        } else if (candidate.name && !formStateBySession[sessionKey].candidateName) {
+          formStateBySession[sessionKey].candidateName = candidate.name;
+        }
+      }
+
+      async function markRemoteCandidateAdded(candidateId) {
+        if (!candidateId) return;
+
+        try {
+          await fetch("/api/candidates", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidate_id: candidateId,
+              is_added_to_guide: true,
+              status: "added_to_guide",
+            }),
+          });
+        } catch (error) {
+          console.error("[remote-candidate-added-error]", error);
+        }
+      }
+
+      async function createCandidate(positionId, name, aiBrief = getDefaultAiBrief()) {
+        const selected = window.INTERVIEW_DATA.positions.find((position) => position.id === positionId);
+
+        try {
+          const response = await fetch("/api/candidates", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              position_title: selected?.name || positionId,
+              candidate_name: name.trim(),
+              source: "manual",
+              status: "registered",
+              is_added_to_guide: true,
+            }),
+          });
+
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.error || payload.detail || "후보자 저장 실패");
+
+          const newCandidate = normalizeCandidate({
+            id: payload.candidate_id || `candidate_${Date.now()}`,
+            name: name.trim(),
+            createdAt: formatDraftDate(),
+            aiBrief,
+            remoteCandidateId: payload.candidate_id || null,
+          });
+
+          persistCandidateLocally(positionId, newCandidate);
+          await loadRemoteCandidates(true);
+          return newCandidate;
+        } catch (error) {
+          console.error("[remote-candidate-create-error]", error);
+
+          const fallbackCandidate = normalizeCandidate({
+            id: `candidate_${Date.now()}`,
+            name: name.trim(),
+            createdAt: formatDraftDate(),
+            aiBrief,
+          });
+          persistCandidateLocally(positionId, fallbackCandidate);
+          return fallbackCandidate;
+        }
+      }
+
+      async function openCandidateModal(positionId) {
+        selectedPositionId = positionId;
+        showCandidateModal = true;
+        render();
+        await loadRemoteCandidates(true);
+        render();
+      }
+
+      async function addCandidateDirectly() {
+        const name = newCandidateName.trim();
+        if (!name) {
+          alert("후보자명을 입력해주세요.");
+          return;
+        }
+
+        const candidate = await createCandidate(selectedPositionId, name);
+        showAddCandidateModal = false;
+        newCandidateName = "";
+        openCandidateGuide(candidate.id);
+      }
+
+      function openCandidateGuide(candidateId) {
+        selectedCandidateId = candidateId;
+        const candidate = getSelectedCandidate();
+        seedCandidateSession(candidate);
+
+        if (candidate?.remoteCandidateId || candidate?.id) {
+          markRemoteCandidateAdded(candidate.remoteCandidateId || candidate.id);
+        }
+
+        const selected = getSelectedPosition();
+        activeNav = selected?.competencies?.[0]?.id || "final-review";
+        currentPage = "guide";
+        showCandidateModal = false;
+        render();
+
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: "auto" });
+          handleScrollSpy();
+        }, 50);
+      }
+
+      async function deleteCandidate(candidateId) {
+        const candidates = getCandidatesForPosition(selectedPositionId);
+        const target = candidates.find((candidate) => candidate.id === candidateId);
+        if (!target) return;
+
+        const ok = confirm(`${target.name} 후보자를 삭제할까요?\n공통 저장된 후보자/AI 분석 결과도 함께 삭제될 수 있습니다.`);
+        if (!ok) return;
+
+        try {
+          if (target.remoteCandidateId || target.remoteAnalysisId || /^[0-9a-f-]{30,}$/i.test(candidateId)) {
+            await fetch("/api/candidates", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                candidate_id: target.remoteCandidateId || candidateId,
+                analysis_id: target.remoteAnalysisId || null,
+              }),
+            });
+          }
+        } catch (error) {
+          console.error("[remote-candidate-delete-error]", error);
+          alert("공통 저장 후보자 삭제 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+
+        const localCandidates = getLocalCandidatesForPosition(selectedPositionId);
+        setCandidatesForPosition(
+          selectedPositionId,
+          localCandidates.filter((candidate) => candidate.id !== candidateId)
+        );
+
+        const sessionKey = getSessionKey(selectedPositionId, candidateId);
+        delete formStateBySession[sessionKey];
+
+        const allCustomQuestions = getAllCustomQuestions();
+        delete allCustomQuestions[sessionKey];
+        setAllCustomQuestions(allCustomQuestions);
+
+        const scorePrefix = getScorePrefix(selectedPositionId, candidateId);
+        Object.keys(selectedScores).forEach((key) => {
+          if (key.startsWith(scorePrefix)) delete selectedScores[key];
+        });
+
+        if (selectedCandidateId === candidateId) {
+          selectedCandidateId = "";
+          currentPage = "landing";
+        }
+
+        await loadRemoteCandidates(true);
+        render();
+      }
+
+      function initializeFromUrlParams() {
+        const params = new URLSearchParams(window.location.search);
+        const positionId = params.get("positionId");
+        const candidateId = params.get("candidateId");
+
+        if (!positionId || !candidateId) return;
+
+        const positionExists = window.INTERVIEW_DATA.positions.some(
+          (position) => position.id === positionId
+        );
+
+        if (!positionExists) return;
+
+        selectedPositionId = positionId;
+
+        loadRemoteCandidates(true).then(() => {
+          const candidateExists = getCandidatesForPosition(positionId).some(
+            (candidate) => candidate.id === candidateId
+          );
+
+          if (!candidateExists) return;
+
+          selectedCandidateId = candidateId;
+          const candidate = getSelectedCandidate();
+          seedCandidateSession(candidate);
+
+          const selected = getSelectedPosition();
+          activeNav = selected?.competencies?.[0]?.id || "final-review";
+          currentPage = "guide";
+
+          window.history.replaceState({}, document.title, window.location.pathname);
+          render();
+        });
+      }
+
       window.openCandidateModal = openCandidateModal;
       window.closeCandidateModal = closeCandidateModal;
       window.openCandidateGuide = openCandidateGuide;
@@ -2305,60 +2713,6 @@ function renderPdfPreview() {
       window.updateNewCandidateName = updateNewCandidateName;
       window.addCandidateDirectly = addCandidateDirectly;
       window.deleteCandidate = deleteCandidate;
-
-      // ===== Phase 45: AI 브리프/질문 표시 안정화 =====
-      // AI 분석 페이지에서 저장한 문장을 구조화면접 가이드에서 다시 훼손하지 않도록 최소 보정만 수행합니다.
-      function cleanupGeneratedText(value) {
-        let text = String(value || "");
-        const replacements = [
-          ["RESTAPI", "REST API"],
-          ["OCRAPI", "OCR API"],
-          ["Next. js", "Next.js"],
-          ["Next .js", "Next.js"],
-          ["Java 와", "Java와"],
-          ["Spring 과", "Spring과"],
-          ["TypeScript 와", "TypeScript와"],
-          ["React 와", "React와"],
-          ["Java와SpringBoot", "Java와 SpringBoot"],
-          ["TypeScript와Next.js", "TypeScript와 Next.js"],
-          ["TypeScript와Next. js", "TypeScript와 Next.js"],
-          ["백엔드개발", "백엔드 개발"],
-          ["프론트엔드개발", "프론트엔드 개발"],
-          ["데이터베이스모델링", "데이터베이스 모델링"],
-          ["요구사항분석", "요구사항 분석"],
-          ["외부시스템연동", "외부 시스템 연동"],
-          ["CI/CD환경", "CI/CD 환경"],
-          ["설명해주세요", "설명해 주세요"],
-          ["말씀해주세요", "말씀해 주세요"],
-          ["확인해주세요", "확인해 주세요"],
-        ];
-        replacements.forEach(([from, to]) => { text = text.replaceAll(from, to); });
-        return text
-          .replace(/\[[0-9]+p\]/gi, "")
-          .replace(/<PARSED TEXT[^>]*>/gi, "")
-          .replace(/(\d+)\s*\/\s*100\s*종합\s*적합도\s*[\.:：-]?/gi, "")
-          .replace(/이력서에서는\s*/g, "")
-          .replace(/내용이\s*우선적으로\s*확인되며,?/g, "")
-          .replace(/필수자격\/필요경험\s*중\s*/g, "")
-          .replace(/,(?=\S)/g, ", ")
-          .replace(/\.([가-힣A-Z])/g, ". $1")
-          .replace(/\)(?=\S)/g, ") ")
-          .replace(/([가-힣])\|([가-힣])/g, "$1 / $2")
-          .replace(/\s{2,}/g, " ")
-          .trim();
-      }
-
-      function shortenLongQuotedText(value) {
-        return cleanupGeneratedText(value).replace(/[“"]([^“”"]{80,})[”"]/g, (match, inner) => {
-          const compact = inner.replace(/\s+/g, " ").trim();
-          return `“${compact.slice(0, 45)}...”`;
-        });
-      }
-
-      function displayAnalysisText(value) {
-        return shortenLongQuotedText(value);
-      }
-
       window.goAiResumeAnalysis = goAiResumeAnalysis;
       window.goLanding = goLanding;
       window.scrollToSection = scrollToSection;
