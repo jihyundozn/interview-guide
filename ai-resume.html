@@ -413,7 +413,7 @@
         try {
           // 포지션명이 저장 시점에 공백/언더바/표기 차이로 조금 달라질 수 있어
           // 서버에서 정확히 일치 필터링하지 않고 전체를 불러온 뒤 화면에서 느슨하게 매칭합니다.
-          const response = await fetch(`/api/candidates`);
+          const response = await fetch(`/api/candidates?_=${Date.now()}`);
           const data = await response.json().catch(() => ({}));
 
           if (!response.ok || data.ok === false) {
@@ -599,6 +599,8 @@
                 action: "delete",
                 candidate_id: item.candidateId || "",
                 analysis_id: item.analysisId || "",
+                candidate_name: item.candidateName || "",
+                position_title: item.positionName || getPositionTitleForRemote(item.positionId || selectedPositionId) || "",
               }),
             });
             const data = await response.json().catch(() => ({}));
@@ -608,6 +610,7 @@
             }
 
             remoteAnalysisHistory = remoteAnalysisHistory.filter((entry) => entry.id !== historyId);
+            setAnalysisHistory(getAnalysisHistory().filter((entry) => entry.id !== historyId && entry.analysisId !== item.analysisId && entry.candidateId !== item.candidateId));
             if (currentAnalysisHistoryId === historyId) {
               currentAnalysisHistoryId = null;
             }
