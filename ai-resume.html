@@ -592,8 +592,14 @@
               throw new Error("삭제에 필요한 후보자 또는 분석 결과 ID가 없습니다.");
             }
 
-            const response = await fetch(`/api/candidates?${params.toString()}`, {
-              method: "DELETE",
+            const response = await fetch(`/api/candidates`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "delete",
+                candidate_id: item.candidateId || "",
+                analysis_id: item.analysisId || "",
+              }),
             });
             const data = await response.json().catch(() => ({}));
 
@@ -605,6 +611,8 @@
             if (currentAnalysisHistoryId === historyId) {
               currentAnalysisHistoryId = null;
             }
+            // 삭제 직후 Supabase 목록을 다시 불러와 다른 브라우저와 동일한 상태를 반영합니다.
+            await loadRemoteAnalysisHistory(selectedPositionId);
             render();
             return;
           } catch (error) {
