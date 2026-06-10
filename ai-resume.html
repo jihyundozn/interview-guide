@@ -361,7 +361,24 @@
         return position?.name || positionId || "";
       }
 
-      function toAnalysisHistoryItemFromRemote(candidate, analysis) {
+      function normalizePositionKey(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/[\s_\-()\[\]{}·,./\\]+/g, "")
+          .replace(/개발자/g, "개발")
+          .trim();
+      }
+
+      function isSameRemotePosition(candidatePositionTitle, positionId = selectedPositionId) {
+        const selected = window.INTERVIEW_DATA.positions.find((item) => item.id === positionId) || getSelectedPosition();
+        const candidates = [selected?.name, selected?.id, getPositionTitleForRemote(positionId)]
+          .map(normalizePositionKey)
+          .filter(Boolean);
+        const remoteKey = normalizePositionKey(candidatePositionTitle);
+        return !remoteKey || candidates.some((key) => key === remoteKey || key.includes(remoteKey) || remoteKey.includes(key));
+      }
+
+      function toAnalysisHistoryItemFromRemote(candidate, analysis, positionId = selectedPositionId) {
         const result = analysis?.analysis_result ? normalizeAnalysis(analysis.analysis_result) : null;
         const questionIds = {};
         (result?.questions || []).forEach((question) => {
@@ -372,8 +389,8 @@
           id: analysis?.id ? `remote_${analysis.id}` : `remote_${candidate?.id || Date.now()}`,
           storageType: "supabase",
           savedAt: analysis?.created_at ? formatDate(new Date(analysis.created_at)) : formatDate(),
-          positionId: selectedPositionId,
-          positionName: candidate?.position_title || getPositionTitleForRemote(),
+          positionId,
+          positionName: candidate?.position_title || getPositionTitleForRemote(positionId),
           candidateName: candidate?.candidate_name || "",
           analysisResult: result,
           selectedQuestionIds: questionIds,
@@ -394,7 +411,9 @@
         render();
 
         try {
-          const response = await fetch(`/api/candidates?position=${encodeURIComponent(positionTitle)}`);
+          // 포지션명이 저장 시점에 공백/언더바/표기 차이로 조금 달라질 수 있어
+          // 서버에서 정확히 일치 필터링하지 않고 전체를 불러온 뒤 화면에서 느슨하게 매칭합니다.
+          const response = await fetch(`/api/candidates`);
           const data = await response.json().catch(() => ({}));
 
           if (!response.ok || data.ok === false) {
@@ -402,30 +421,32 @@
           }
 
           const items = [];
-          (data.candidates || []).forEach((candidate) => {
-            const analyses = Array.isArray(candidate.ai_resume_analyses) ? candidate.ai_resume_analyses : [];
-            if (!analyses.length) {
-              items.push({
-                id: `remote_candidate_${candidate.id}`,
-                storageType: "supabase",
-                savedAt: candidate.created_at ? formatDate(new Date(candidate.created_at)) : formatDate(),
-                positionId,
-                positionName: candidate.position_title || positionTitle,
-                candidateName: candidate.candidate_name || "",
-                analysisResult: null,
-                selectedQuestionIds: {},
-                addedToGuide: Boolean(candidate.is_added_to_guide),
-                addedAt: candidate.added_to_guide_at ? formatDate(new Date(candidate.added_to_guide_at)) : "",
-                candidateId: candidate.id,
-                analysisId: candidate.latest_analysis_id || "",
-              });
-              return;
-            }
+          (data.candidates || [])
+            .filter((candidate) => isSameRemotePosition(candidate.position_title, positionId))
+            .forEach((candidate) => {
+              const analyses = Array.isArray(candidate.ai_resume_analyses) ? candidate.ai_resume_analyses : [];
+              if (!analyses.length) {
+                items.push({
+                  id: `remote_candidate_${candidate.id}`,
+                  storageType: "supabase",
+                  savedAt: candidate.created_at ? formatDate(new Date(candidate.created_at)) : formatDate(),
+                  positionId,
+                  positionName: candidate.position_title || positionTitle,
+                  candidateName: candidate.candidate_name || "",
+                  analysisResult: null,
+                  selectedQuestionIds: {},
+                  addedToGuide: Boolean(candidate.is_added_to_guide),
+                  addedAt: candidate.added_to_guide_at ? formatDate(new Date(candidate.added_to_guide_at)) : "",
+                  candidateId: candidate.id,
+                  analysisId: candidate.latest_analysis_id || "",
+                });
+                return;
+              }
 
-            analyses.forEach((analysis) => {
-              items.push(toAnalysisHistoryItemFromRemote(candidate, analysis));
+              analyses.forEach((analysis) => {
+                items.push(toAnalysisHistoryItemFromRemote(candidate, analysis, positionId));
+              });
             });
-          });
 
           remoteAnalysisHistory = items;
         } catch (error) {
