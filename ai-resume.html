@@ -244,9 +244,9 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-hr-password": hrEditPassword,
             },
             body: JSON.stringify({
+              hrPassword: hrEditPassword,
               positionId: selectedPositionId,
               positionName: selected?.name || selectedPositionId,
               keyTasks: draft.keyTasks.trim(),
