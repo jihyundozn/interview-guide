@@ -1776,17 +1776,19 @@ function renderPdfPreview() {
                   }
 
                   #pdf-content .pdf-score-box {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
+                    display: inline-block;
                     margin-top: 12px;
+                    min-width: 86px;
                     border-radius: 999px;
                     background: #eff6ff;
                     border: 1px solid #bfdbfe;
                     padding: 7px 12px;
                     font-size: 13px;
+                    line-height: 1.35;
                     font-weight: 800;
                     color: #1d4ed8;
+                    white-space: nowrap;
+                    text-align: center;
                   }
 
                   #pdf-content .pdf-memo-box {
@@ -1811,11 +1813,19 @@ function renderPdfPreview() {
                     color: #374151;
                   }
 
-                  #pdf-content .pdf-final-grid {
-                    margin-top: 28px;
+                  #pdf-content .pdf-force-page-break {
                     display: block;
+                    height: 0;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
                     page-break-before: always;
                     break-before: page;
+                  }
+
+                  #pdf-content .pdf-final-grid {
+                    margin-top: 0;
+                    display: block;
                   }
 
                   #pdf-content .pdf-final-opinion-card,
@@ -1823,6 +1833,8 @@ function renderPdfPreview() {
                     width: 100%;
                     border-radius: 22px;
                     padding: 20px;
+                    page-break-inside: avoid;
+                    break-inside: avoid;
                   }
 
                   #pdf-content .pdf-followup-card {
@@ -1923,10 +1935,7 @@ function renderPdfPreview() {
                               <p class="pdf-main-question-label">${data.labels.mainQuestion}</p>
                               <p class="pdf-main-question-text">${escapeHtml(displayAnalysisText(q.main))}</p>
 
-                              <div class="pdf-score-box">
-                                <span>점수</span>
-                                <span>${score || "-"} / 5</span>
-                              </div>
+                              <div class="pdf-score-box">점수 ${score ?? "-"} / 5</div>
 
                               <div class="pdf-memo-box">
                                 <p class="pdf-memo-title">${data.labels.memoSummary}</p>
@@ -1971,10 +1980,7 @@ function renderPdfPreview() {
                                 : ""
                             }
 
-                            <div class="pdf-score-box">
-                              <span>점수</span>
-                              <span>${score || "-"} / 5</span>
-                            </div>
+                            <div class="pdf-score-box">점수 ${score ?? "-"} / 5</div>
 
                             <div class="pdf-memo-box">
                               <p class="pdf-memo-title">${data.labels.memoSummary}</p>
@@ -1990,6 +1996,7 @@ function renderPdfPreview() {
                     : ""
                 }
 
+                <div class="pdf-force-page-break"></div>
                 <div class="pdf-final-grid pdf-final-section">
                   <div class="pdf-final-opinion-card">
                     <p class="pdf-final-card-title">${data.labels.overallCommentTitle}</p>
@@ -2374,9 +2381,9 @@ function renderPdfPreview() {
             orientation: "portrait",
           },
           pagebreak: {
-            mode: ["avoid-all", "css", "legacy"],
-            avoid: [".pdf-question-card", ".pdf-memo-box", ".pdf-final-decision-card"],
-            before: [".pdf-final-grid"],
+            mode: ["css", "legacy"],
+            avoid: [".pdf-question-card", ".pdf-memo-box", ".pdf-final-opinion-card", ".pdf-followup-card", ".pdf-final-decision-card"],
+            before: [".pdf-force-page-break"],
           },
         };
 
