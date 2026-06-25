@@ -1815,12 +1815,11 @@ function renderPdfPreview() {
 
                   #pdf-content .pdf-force-page-break {
                     display: block;
-                    height: 0;
+                    height: 1px;
                     margin: 0;
                     padding: 0;
+                    clear: both;
                     overflow: hidden;
-                    page-break-before: always;
-                    break-before: page;
                   }
 
                   #pdf-content .pdf-final-grid {
@@ -1996,7 +1995,7 @@ function renderPdfPreview() {
                     : ""
                 }
 
-                <div class="pdf-force-page-break"></div>
+                <div class="html2pdf__page-break pdf-force-page-break"></div>
                 <div class="pdf-final-grid pdf-final-section">
                   <div class="pdf-final-opinion-card">
                     <p class="pdf-final-card-title">${data.labels.overallCommentTitle}</p>
@@ -2381,9 +2380,8 @@ function renderPdfPreview() {
             orientation: "portrait",
           },
           pagebreak: {
-            mode: ["css", "legacy"],
+            mode: ["legacy", "css"],
             avoid: [".pdf-question-card", ".pdf-memo-box", ".pdf-final-opinion-card", ".pdf-followup-card", ".pdf-final-decision-card"],
-            before: [".pdf-force-page-break"],
           },
         };
 
