@@ -1825,15 +1825,15 @@ function renderPdfPreview() {
 
                   #pdf-content .pdf-force-page-break {
                     display: block;
-                    height: 1px;
-                    margin: 0;
+                    height: 24px;
+                    margin: 22px 0 0;
                     padding: 0;
                     clear: both;
                     overflow: hidden;
                   }
 
                   #pdf-content .pdf-final-grid {
-                    margin-top: 0;
+                    margin-top: 24px;
                     display: block;
                   }
 
@@ -1842,6 +1842,7 @@ function renderPdfPreview() {
                     width: 100%;
                     border-radius: 22px;
                     padding: 20px;
+                    border: 0;
                     page-break-inside: avoid;
                     break-inside: avoid;
                   }
@@ -1856,21 +1857,17 @@ function renderPdfPreview() {
                   }
 
                   #pdf-content .pdf-final-decision-card {
-                    margin-top: 20px;
+                    margin-top: 22px;
                     page-break-inside: avoid;
                     break-inside: avoid;
                   }
 
                   #pdf-content .pdf-final-opinion-card {
-                    background: #ecfdf5;
-                    border: 1px solid #a7f3d0;
-                    border-left: 5px solid #10b981;
+                    background: #f1f8f4;
                   }
 
                   #pdf-content .pdf-followup-card {
-                    background: #fff7ed;
-                    border: 1px solid #fed7aa;
-                    border-left: 5px solid #f97316;
+                    background: #fbf4ec;
                   }
 
                   #pdf-content .pdf-final-card-title {
